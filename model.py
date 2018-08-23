@@ -30,12 +30,12 @@ def generate_model(in_shape, show=False):
 	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
 	model.add(Conv2D(3, (3, 3), activation='relu'))
-	model.add(Conv2D(24, (3, 3), activation='relu'))
-	# model.add(Conv2D(36, (3, 3), activation='relu'))	
-	# model.add(Conv2D(64, (3, 3), activation='relu'))	
+	# model.add(Conv2D(24, (3, 3), activation='relu'))
+	# # model.add(Conv2D(36, (3, 3), activation='relu'))	
+	# # model.add(Conv2D(64, (3, 3), activation='relu'))	
 	model.add(Flatten())
 	# model.add(Dense(512))
-	model.add(Dense(128))
+	# model.add(Dense(128))
 	model.add(Dense(32))
 	model.add(Dense(1))
 
@@ -53,32 +53,27 @@ def generate_model(in_shape, show=False):
 
 if __name__ == "__main__":
 
-	BATCH_SIZE = 32
-	if False:
-		_valid_generator = data_server.batch_generator(train_type='valid', batch_size=BATCH_SIZE)
-		for i, (batch_x, batch_y) in enumerate(_valid_generator):
-			pass		
-		print("valid", i)
-
-	train_generator = data_server.batch_generator(train_type='train', batch_size=BATCH_SIZE)
-	validation_generator  = data_server.batch_generator(train_type='valid', batch_size=BATCH_SIZE)
-	for batch_x, batch_y in train_generator:
-		in_shape = batch_x[0].shape
-		break
-	train_generator = data_server.batch_generator(train_type='train', batch_size=BATCH_SIZE)
+	BATCH_SIZE = 128
+	# train_generator = data_server.batch_generator(train_type='train', batch_size=BATCH_SIZE)
+	# validation_generator  = data_server.batch_generator(train_type='valid', batch_size=BATCH_SIZE)
+	# for batch_x, batch_y in train_generator:
+	# 	in_shape = batch_x[0].shape
+	# 	break
+	# train_generator = data_server.batch_generator(train_type='train', batch_size=BATCH_SIZE)
 	# imshow_cropped(batch_x[0])
 	# ipdb.set_trace()
-
-	EPOCHS=1
+	train_generator = data_gen = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
+	valid_generator = data_gen = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
+	EPOCHS=2
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
 	samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)
-	model = generate_model(in_shape)
+	model = generate_model(in_shape=(160, 320, 3))
+
 	model.fit_generator(
 		generator=train_generator,
-		samples_per_epoch=samples_per_epoch,
 		verbose=1,
-		validation_data=validation_generator,
+		validation_data=valid_generator,
 		validation_steps=validation_steps)
 
 	ipdb.set_trace()

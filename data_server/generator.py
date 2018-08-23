@@ -1,4 +1,8 @@
-""" This module generates data """
+""" This module generates data 
+
+	resources: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly.html
+
+"""
 
 
 import os
@@ -10,6 +14,7 @@ from io import BytesIO
 import ipdb
 import numpy as np
 import base64
+import keras
 
 class Singleton(type):
 	""" https://stackoverflow.com/questions/6760685/creating-a-singleton-in-python
@@ -22,11 +27,10 @@ class Singleton(type):
 
 class Process(object, metaclass=Singleton):
 
-	def __init__(self, data_folder='/opt/behavioral_cloning', shuffle=True, train_size=0.7):
+	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.7):
 		self.data_folder = data_folder
 		self.folders = []
 
-		metadata = pd.DataFrame(columns=['image', 'steering', 'type'])
 		submetadata = []
 		for sub_folder in os.listdir(self.data_folder):
 			curr_dir = os.path.join(self.data_folder, sub_folder)
@@ -45,7 +49,7 @@ class Process(object, metaclass=Singleton):
 
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
 		if shuffle:
-			self.metadata = self.metadata.sample(frac=1)
+			self.shuffle() # = self.metadata.sample(frac=1)
 
 		self.metadata.loc[: ,"type"] = None
 		train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
@@ -54,6 +58,11 @@ class Process(object, metaclass=Singleton):
 		self.metadata.loc[train_idx, "train_type"] = "train"
 		self.metadata.loc[val_idx, "train_type"] = "valid"
 		self.metadata.loc[test_idx, "train_type"] = "test"
+
+	def shuffle(self):
+		self.metadata = self.metadata.sample(frac=1)
+		self.metadata = self.metadata.sample(frac=1)
+		self.metadata = self.metadata.sample(frac=1)
 
 	def samples_per_epoch(self, batch_size, train_type="train"):
 		filt = (self.metadata["train_type"] == train_type)
@@ -65,10 +74,17 @@ class Process(object, metaclass=Singleton):
 		filt = (self.metadata["train_type"] == train_type)
 		return len(self.metadata[filt])
 
+	def augment_len(self):
+		return 1
+
 	def augment(self, image, steering):
 		for xi in range(1):
 			yield image, steering
 
+	def get_indices(self, train_type, index, batch_size):
+		filt = (self.metadata["train_type"] == train_type)
+		indices = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size].index
+		return indices
 
 	def get(self, train_type):
 		for index, row in self.metadata[self.metadata["train_type"] == train_type].iterrows():
@@ -76,11 +92,45 @@ class Process(object, metaclass=Singleton):
 			for _x, _y in self.augment(img, row['steering']):
 				yield _x, _y
 
+	def data_generation(self, indices, batch_size):
+
+		# batch_size *= # of augmentations!
+		batch_size *= 1
+		X = None #np.empty((batch_size, height, width, nchannels))
+		y = None #np.empty((batch_size), dtype=int)
+
+		# Generate data
+		for i, index in enumerate(indices):
+			row = self.metadata.loc[index]
+			img = np.asarray(Image.open(row['image']))
+
+			if X is None or y is None:
+				X = np.empty((batch_size, *img.shape))
+				y = np.empty((batch_size), dtype=int)
+
+			for _x, _y in self.augment(img, row['steering']):
+				X[i,] = _x
+				y[i] = _y
+
+		return X, y
+		# for i, (ID) in enumerate(list_IDs_temp):
+		# 	# Store sample
+		# 	X[i,] = np.load('data/' + ID + '.npy')
+
+		# 	# Store class
+		# 	y[i] = self.labels[ID]
+
+		# return X, keras.utils.to_categorical(y, num_classes=self.n_classes)
+
+
+
 def batch_generator(train_type='train', batch_size=None):
 	assert batch_size is not None
 	process = Process()
 	batch_x, batch_y = None, None
-	for i_batch, (_x, _y) in enumerate(process.get(train_type)):
+	i_batch = 0
+	while True:
+		_x, _y = next(process.get(train_type))
 		if batch_x is None:
 			height, width, nchannels = _x.shape
 			batch_x = np.zeros((batch_size, height, width, nchannels), np.uint8)
@@ -91,26 +141,81 @@ def batch_generator(train_type='train', batch_size=None):
 		if i_batch % batch_size == batch_size - 1:
 			yield batch_x, batch_y
 			batch_x, batch_y = None, None
+		
+		i_batch += 1
+		print(len(batch_x))
+
+
+	# for i_batch, (_x, _y) in enumerate(process.get(train_type)):
+	# 	if batch_x is None:
+	# 		height, width, nchannels = _x.shape
+	# 		batch_x = np.zeros((batch_size, height, width, nchannels), np.uint8)
+	# 		batch_y = np.zeros(batch_size)
+
+	# 	batch_x[i_batch % batch_size] = _x
+	# 	batch_y[i_batch % batch_size] = _y
+	# 	if i_batch % batch_size == batch_size - 1:
+	# 		yield batch_x, batch_y
+	# 		batch_x, batch_y = None, None
+
+class DataGenerator(keras.utils.Sequence):
+	# def __init__(self, list_IDs, labels, batch_size=32, dim=(32,32,32), nchannels=1,
+	#              n_classes=10, shuffle=True):
+	# def __init__(self, train_type, batch_size, height, width, nchannels, shuffle=True):
+
+	def __init__(self, train_type, batch_size, shuffle=True):
+		self.train_type = train_type
+		# self.height = height
+		# self.width = width
+		self.batch_size = batch_size * Process().augment_len()
+		# self.nchannels = nchannels
+		self.shuffle = shuffle
+		self.on_epoch_end()
+
+	def __len__(self):
+		'Denotes the number of batches per epoch'
+		#return int(np.floor(len(self.list_IDs) / self.batch_size))
+		return int(np.floor(Process().total_samples(self.train_type) / self.batch_size))
+
+	def __getitem__(self, index):
+		indices = Process().get_indices(self.train_type, index, self.batch_size)
+		
+		# Generate data
+		X, y = Process().data_generation(indices, self.batch_size)
+		#data_generation(self, indices, batch_size, height, width, nchannels):
+
+		return X, y
+
+	def on_epoch_end(self):
+		'Updates indexes after each epoch'
+		if self.shuffle == True:
+			Process().shuffle()
 
 
 if __name__ == "__main__":
 
 	BATCH_SIZE = 128
-	_valid_generator = batch_generator(train_type='valid', batch_size=BATCH_SIZE)
-	for i, (batch_x, batch_y) in enumerate(_valid_generator):
-		pass		
-	print("valid", i)
+	# height, width, nchannels = (160, 320, 3)
+	# data_gen = DataGenerator("train", batch_size=BATCH_SIZE, height=height, width=width, nchannels=nchannels, shuffle=True)
+	data_gen = DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
+	print(data_gen[1])
+	print(len(data_gen))
+
+	# _valid_generator = batch_generator(train_type='valid', batch_size=BATCH_SIZE)
+	# for i, (batch_x, batch_y) in enumerate(_valid_generator):
+	# 	pass		
+	# print("valid", i)
 
 
-	_test_generator = batch_generator(train_type='test', batch_size=BATCH_SIZE)
-	for i, (batch_x, batch_y) in enumerate(_test_generator):
-		pass		
-	print("test", i)
+	# _test_generator = batch_generator(train_type='test', batch_size=BATCH_SIZE)
+	# for i, (batch_x, batch_y) in enumerate(_test_generator):
+	# 	pass		
+	# print("test", i)
 
-	_train_generator = batch_generator(train_type='train', batch_size=BATCH_SIZE)
-	for i, (batch_x, batch_y) in enumerate(_train_generator):
-		pass		
-	print("train", i)
+	# _train_generator = batch_generator(train_type='train', batch_size=BATCH_SIZE)
+	# for i, (batch_x, batch_y) in enumerate(_train_generator):
+	# 	pass		
+	# print("train", i)
 
 
 # generator = iter(process)
