@@ -30,26 +30,17 @@ def generate_model(in_shape, show=False):
 	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
 	model.add(Conv2D(3, (3, 3), activation='relu'))
-	# model.add(Conv2D(24, (3, 3), activation='relu'))
-	# # model.add(Conv2D(36, (3, 3), activation='relu'))	
-	# # model.add(Conv2D(64, (3, 3), activation='relu'))	
+	model.add(Conv2D(24, (3, 3), activation='relu'))
+	model.add(Conv2D(36, (3, 3), activation='relu'))	
+	model.add(Conv2D(64, (3, 3), activation='relu'))	
 	model.add(Flatten())
-	# model.add(Dense(512))
-	# model.add(Dense(128))
+	model.add(Dense(128))
 	model.add(Dense(32))
 	model.add(Dense(1))
 
 	model.compile(loss="mse", optimizer="adam")
 	return model
 
-	
-
-
-
-
-
-
-	return model
 
 if __name__ == "__main__":
 
