@@ -37,6 +37,24 @@ The goals / steps of this project are the following:
 * Use the model to drive the vehicle autonomously around the first track in the simulator. The vehicle should remain on the road for an entire loop around the track.
 * Summarize the results with a written report
 
+PROJECT SPECIFICATION
+---
+| Topic  | CRITERIA   | MEETS SPECIFICATIONS |
+|---|---|---|
+|Required Files | Are all required files submitted? | The submission includes a model.py file, drive.py, model.h5 a writeup report and video.mp4.   |
+| Quality of Code  | Is the code functional?  | The model provided can be used to successfully operate the simulation.  |
+| Quality of Code  | Is the code usable and readable?  | The code in model.py uses a Python generator, if needed, to generate data for training rather than storing the training data in memory. The model.py code is clearly organized and comments are included where needed. |
+| Model Architecture and Training Strategy  | Has an appropriate model architecture been employed for the task? |The neural network uses convolution layers with appropriate filter sizes. Layers exist to introduce nonlinearity into the model. The data is normalized in the model.  | 
+| Model Architecture and Training Strategy  | Has an attempt been made to reduce overfitting of the model?  | Train/validation/test splits have been used, and the model uses dropout layers or other methods to reduce overfitting.  |
+| Model Architecture and Training Strategy  | Have the model parameters been tuned appropriately?  |Learning rate parameters are chosen with explanation, or an Adam optimizer is used.   |
+| Model Architecture and Training Strategy  | Is the training data chosen appropriately?  | Training data has been chosen to induce the desired behavior in the simulation (i.e. keeping the car on the track). |
+| Architecture and Training Documentation  | Is the solution design documented?  | The README thoroughly discusses the approach taken for deriving and designing a model architecture fit for solving the given problem.   |
+| Architecture and Training Documentation  | Is the model architecture documented?  | The README provides sufficient details of the characteristics and qualities of the architecture, such as the type of model used, the number of layers, the size of each layer. Visualizations emphasizing particular qualities of the architecture are encouraged.  |
+| Architecture and Training Documentation  | Is the creation of the training dataset and training process documented? |  The README describes how the model was trained and what the characteristics of the dataset are. Information such as how the dataset was generated and examples of images from the dataset must be included. |
+| Simulation | Is the car able to navigate correctly on test data?  | No tire may leave the drivable portion of the track surface. The car may not pop up onto ledges or roll over any surfaces that would otherwise be considered unsafe (if humans were in the vehicle). |
+
+
+
 ### Dependencies
 This lab requires:
 
