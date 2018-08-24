@@ -28,7 +28,6 @@ def imshow_cropped(image, save=False, show=False):
 		plt.imshow(new_image[0,...]/255, cmap='gray')
 		plt.show()
 
-
 #def Nvidia
 def nvidia_model(in_shape):
 	#model = Sequential()
@@ -81,7 +80,6 @@ def generate_model(model_name, in_shape):
 		raise Exception("select test/nvidia models")
 	return model
 
-
 if __name__ == "__main__":
 	model_name = "nvidia"
 	if len(sys.argv) > 1:
@@ -113,6 +111,14 @@ if __name__ == "__main__":
 		validation_steps=validation_steps,
 		nb_epoch=EPOCHS)
 
+
+	model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
+	model.save_weights('model_weights.h5')
+
+	del model  # deletes the existing model
+
+	model = load_model('model.h5')
+	# model.load_weights('my_model_weights.h5', by_name=True)
 
 	model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 	model.save_weights('model_weights.h5')
