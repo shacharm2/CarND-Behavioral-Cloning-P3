@@ -94,6 +94,11 @@ class Process(object, metaclass=Singleton):
 		# for xi in range(1):
 		# 	yield image, steering
 		#if row['augment'] == 'flip':
+
+		# (1) no augmentations
+		yield image, metadata['steering']
+
+		# (2) flip
 		if metadata['flip']:
 			flipped = cv2.flip(image, 1)
 			steering = - metadata['steering']
