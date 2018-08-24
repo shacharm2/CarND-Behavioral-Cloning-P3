@@ -79,9 +79,9 @@ def generate_model(model_name, in_shape):
 
 
 if __name__ == "__main__":
-	model_name = "nvidia"
-if len(sys.argv) > 1:
-		model_name = sys.argv[-1]
+		model_name = "nvidia"
+	if len(sys.argv) > 1:
+			model_name = sys.argv[-1]
 
 	model = generate_model(model_name="test", in_shape=(160, 320, 3))
 
