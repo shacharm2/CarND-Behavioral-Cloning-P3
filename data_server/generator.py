@@ -9,6 +9,7 @@ import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import cv2
+import numpy as np
 from PIL import Image
 from io import BytesIO
 import ipdb
@@ -38,7 +39,7 @@ class Process(object, metaclass=Singleton):
 			if not os.path.isdir(curr_dir):
 				continue
 			csv_metadata = os.path.join(curr_dir, 'driving_log.csv')
-			
+
 			metadata_i = pd.read_csv(csv_metadata)
 			temp = pd.DataFrame(index=metadata_i.index)
 			alpha = {'left': .25, 'center': 0, 'right': .25}
@@ -49,13 +50,21 @@ class Process(object, metaclass=Singleton):
 				submetadata.append(concat)
 
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
+
+		# reduce 0 angle samples
+		nonzero_df = self.metadata[self.metadata['steering'] != 0]
+		zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=0.5)
+		self.metadata = pd.concat([zero_df, nonzero_df], axis='rows')
+
+
 		self.metadata.loc[:, 'flip'] = False
-		
+
 		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant
 		flip_md = self.metadata[self.metadata['steering'].abs() < 0.01]
 		flip_md.loc[:, 'flip'] = True
-		#augmentations_md.loc[:, 'steering'] = augmentations_md['steering'].apply(lambda x: -x)
 		self.metadata = pd.concat([self.metadata, flip_md], axis='rows', ignore_index=True)
+
+
 
 		if shuffle:
 			self.shuffle() # = self.metadata.sample(frac=1)
@@ -100,9 +109,14 @@ class Process(object, metaclass=Singleton):
 
 		# (2) flip
 		if metadata['flip']:
-			flipped = cv2.flip(image, 1)
+			# or .. flipped = cv2.flip(image, 1)
+			flipped = np.fliplr(image)
 			steering = - metadata['steering']
 			yield flipped, steering
+
+		# TODO: rotate ..
+		# TODO: sheer ..
+		# TODO: exagerate opposite angle and camera
 
 	def get_indices(self, train_type, index, batch_size):
 		""" """

@@ -3,7 +3,7 @@
 
 
 """
-
+import sys
 import data_server
 import tensorflow as tf
 from keras.models import Model, Sequential, load_model
@@ -38,13 +38,17 @@ def nvidia_model(in_shape):
 
 	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
-	model.add(Conv2D(3, (3, 3), activation='relu'))
-	model.add(Conv2D(24, (3, 3), activation='relu'))
-	model.add(Conv2D(36, (3, 3), activation='relu'))	
-	model.add(Conv2D(64, (3, 3), activation='relu'))	
+
+	model.add(Conv2D(3, (5, 5), activation='relu'))
+	model.add(Conv2D(24, (5, 5), activation='relu'))
+	model.add(Conv2D(36, (5, 5), activation='relu'))
+	model.add(Conv2D(48, (3, 3), activation='relu'))
+	model.add(Conv2D(64, (3, 3), activation='relu'))
 	model.add(Flatten())
-	model.add(Dense(128))
-	model.add(Dense(32))
+	model.add(Dense(1164))
+	model.add(Dense(100))
+	model.add(Dense(50))
+	model.add(Dense(10))
 	model.add(Dense(1))
 
 	model.compile(loss="mse", optimizer="adam")
@@ -79,9 +83,9 @@ def generate_model(model_name, in_shape):
 
 
 if __name__ == "__main__":
-		model_name = "nvidia"
+	model_name = "nvidia"
 	if len(sys.argv) > 1:
-			model_name = sys.argv[-1]
+		model_name = sys.argv[-1]
 
 	model = generate_model(model_name="test", in_shape=(160, 320, 3))
 
@@ -106,7 +110,9 @@ if __name__ == "__main__":
 		generator=train_generator,
 		verbose=1,
 		validation_data=valid_generator,
-		validation_steps=validation_steps)
+		validation_steps=validation_steps,
+		nb_epoch=EPOCHS)
+
 
 	model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 	model.save_weights('model_weights.h5')
