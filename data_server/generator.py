@@ -95,7 +95,7 @@ class Process(object, metaclass=Singleton):
 		# 	yield image, steering
 		#if row['augment'] == 'flip':
 
-		# (1) no augmentations
+		# (1) identity
 		yield image, metadata['steering']
 
 		# (2) flip
