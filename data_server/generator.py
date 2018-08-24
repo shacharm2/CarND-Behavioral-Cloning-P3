@@ -14,6 +14,7 @@ from io import BytesIO
 import ipdb
 import numpy as np
 import base64
+from matplotlib import pyplot as plt
 import keras
 
 class Singleton(type):
@@ -48,52 +49,71 @@ class Process(object, metaclass=Singleton):
 				submetadata.append(concat)
 
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
+		self.metadata.loc[:, 'flip'] = False
+		
+		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant
+		flip_md = self.metadata[self.metadata['steering'].abs() < 0.01]
+		flip_md.loc[:, 'flip'] = True
+		#augmentations_md.loc[:, 'steering'] = augmentations_md['steering'].apply(lambda x: -x)
+		self.metadata = pd.concat([self.metadata, flip_md], axis='rows', ignore_index=True)
+
 		if shuffle:
 			self.shuffle() # = self.metadata.sample(frac=1)
 
-		self.metadata.loc[: ,"type"] = None
+		self.metadata.loc[: ,'type'] = None
 		train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
 		val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
 
-		self.metadata.loc[train_idx, "train_type"] = "train"
-		self.metadata.loc[val_idx, "train_type"] = "valid"
-		self.metadata.loc[test_idx, "train_type"] = "test"
+		self.metadata.loc[train_idx, 'train_type'] = 'train'
+		self.metadata.loc[val_idx, 'train_type'] = 'valid'
+		self.metadata.loc[test_idx, 'train_type'] = 'test'
+
+	def angle_statistics(self):
+		ipdb.set_trace()
 
 	def shuffle(self):
+		""" """
 		self.metadata = self.metadata.sample(frac=1)
 		self.metadata = self.metadata.sample(frac=1)
 		self.metadata = self.metadata.sample(frac=1)
 
-	def samples_per_epoch(self, batch_size, train_type="train"):
-		filt = (self.metadata["train_type"] == train_type)
+	def samples_per_epoch(self, batch_size, train_type='train'):
+		""" """
+		filt = (self.metadata['train_type'] == train_type)
 		total_train_images = len(self.metadata[filt])
 		samples_per_epoch = total_train_images - total_train_images % batch_size
 		return samples_per_epoch
 
 	def total_samples(self, train_type):
-		filt = (self.metadata["train_type"] == train_type)
+		""" """
+		filt = (self.metadata['train_type'] == train_type)
 		return len(self.metadata[filt])
 
-	def augment_len(self):
-		return 1
-
-	def augment(self, image, steering):
-		for xi in range(1):
-			yield image, steering
+	def augment(self, image, metadata):
+		""" """
+		# for xi in range(1):
+		# 	yield image, steering
+		#if row['augment'] == 'flip':
+		if metadata['flip']:
+			flipped = cv2.flip(image, 1)
+			steering = - metadata['steering']
+			yield flipped, steering
 
 	def get_indices(self, train_type, index, batch_size):
-		filt = (self.metadata["train_type"] == train_type)
+		""" """
+		filt = (self.metadata['train_type'] == train_type)
 		indices = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size].index
 		return indices
 
 	def get(self, train_type):
-		for index, row in self.metadata[self.metadata["train_type"] == train_type].iterrows():
+		""" """
+		for _, row in self.metadata[self.metadata['train_type'] == train_type].iterrows():
 			img = np.asarray(Image.open(row['image']))
-			for _x, _y in self.augment(img, row['steering']):
+			for _x, _y in self.augment(img, row):
 				yield _x, _y
 
 	def data_generation(self, indices, batch_size):
-
+		""" """
 		# batch_size *= # of augmentations!
 		batch_size *= 1
 		X = None #np.empty((batch_size, height, width, nchannels))
@@ -108,7 +128,7 @@ class Process(object, metaclass=Singleton):
 				X = np.empty((batch_size, *img.shape))
 				y = np.empty((batch_size), dtype=int)
 
-			for _x, _y in self.augment(img, row['steering']):
+			for _x, _y in self.augment(img, row):
 				X[i,] = _x
 				y[i] = _y
 
@@ -125,6 +145,7 @@ class Process(object, metaclass=Singleton):
 
 
 def batch_generator(train_type='train', batch_size=None):
+	""" """
 	assert batch_size is not None
 	process = Process()
 	batch_x, batch_y = None, None
@@ -167,7 +188,7 @@ class DataGenerator(keras.utils.Sequence):
 		self.train_type = train_type
 		# self.height = height
 		# self.width = width
-		self.batch_size = batch_size * Process().augment_len()
+		self.batch_size = batch_size
 		# self.nchannels = nchannels
 		self.shuffle = shuffle
 		self.on_epoch_end()
@@ -192,33 +213,12 @@ class DataGenerator(keras.utils.Sequence):
 			Process().shuffle()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
 	BATCH_SIZE = 128
-	# height, width, nchannels = (160, 320, 3)
-	# data_gen = DataGenerator("train", batch_size=BATCH_SIZE, height=height, width=width, nchannels=nchannels, shuffle=True)
 	data_gen = DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	print(data_gen[1])
 	print(len(data_gen))
 
-	# _valid_generator = batch_generator(train_type='valid', batch_size=BATCH_SIZE)
-	# for i, (batch_x, batch_y) in enumerate(_valid_generator):
-	# 	pass		
-	# print("valid", i)
-
-
-	# _test_generator = batch_generator(train_type='test', batch_size=BATCH_SIZE)
-	# for i, (batch_x, batch_y) in enumerate(_test_generator):
-	# 	pass		
-	# print("test", i)
-
-	# _train_generator = batch_generator(train_type='train', batch_size=BATCH_SIZE)
-	# for i, (batch_x, batch_y) in enumerate(_train_generator):
-	# 	pass		
-	# print("train", i)
-
-
-# generator = iter(process)
-# process = Process()
-# for x in process.get('train'):
-# 	print(x)
+	Process().metadata
+	ipdb.set_trace()
