@@ -98,7 +98,7 @@ if __name__ == "__main__":
 	# ipdb.set_trace()
 	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
-	EPOCHS=3
+	EPOCHS=10
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
 	# samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)

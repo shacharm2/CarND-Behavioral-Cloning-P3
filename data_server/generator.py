@@ -42,7 +42,7 @@ class Process(object, metaclass=Singleton):
 
 			metadata_i = pd.read_csv(csv_metadata)
 			temp = pd.DataFrame(index=metadata_i.index)
-			alpha = {'left': .25, 'center': 0, 'right': .25}
+			alpha = {'left': .25, 'center': 0, 'right': -.25}
 			for direction in ['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
 				concat = pd.concat([abs_paths, metadata_i['steering'] + alpha[direction]], axis='columns')
