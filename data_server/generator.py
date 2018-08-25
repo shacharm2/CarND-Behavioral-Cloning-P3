@@ -1,9 +1,9 @@
-""" This module generates data 
+""" This module generates csv_metadata
 
 	resources:
 		https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly.html
 		https://arxiv.org/pdf/1710.05381.pdf
-			
+
 """
 
 
@@ -17,7 +17,11 @@ from io import BytesIO
 import ipdb
 import numpy as np
 import base64
+import matplotlib
+matplotlib.use('Agg')
+
 from matplotlib import pyplot as plt
+
 import keras
 
 class Singleton(type):
@@ -34,7 +38,7 @@ class Process(object, metaclass=Singleton):
 	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.7):
 		self.data_folder = data_folder
 		self.folders = []
-		
+
 		self.out_folder = "output_images"
 
 		submetadata = []
