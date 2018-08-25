@@ -49,14 +49,21 @@ class Process(object, metaclass=Singleton):
 			fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(20,20))
 
 			metadata_i = pd.read_csv(csv_metadata)
-			alpha = {'left': .25, 'center': 0, 'right': -.25}
+
+			# metadata_i['flip'] = False
+			# metadata_i.loc[metadata_i['steering'].abs() < 0.01, 'flip'] = True
+			
+
+			side_camera_bias = .25
+			alpha = {'left': side_camera_bias, 'center': 0, 'right': -side_camera_bias}
 			for ndir, direction in enumerate(sorted(alpha)):  #['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
 				steering_angle = (metadata_i['steering'] + alpha[direction])
 				steering_angle.plot(linewidth=2, color='b', ax=axes[ndir], label='raw', alpha=0.5)
 				axes[ndir].fill_between(steering_angle.index, 0, steering_angle, color='b', alpha=0.5)
 
-				steering_angle = steering_angle.rolling(4, center=True).mean()
+				steering_angle = steering_angle.rolling(4, center=True).mean().fillna(method='ffill').fillna(method='bfill')
+				
 				steering_angle.plot(linewidth=2, color='tab:olive', ax=axes[ndir], label='interp', alpha=0.8)
 				axes[ndir].set_title(direction)
 				axes[ndir].legend()
@@ -71,20 +78,53 @@ class Process(object, metaclass=Singleton):
 
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
 		# reduce 0 angle samples
-		nonzero_df = self.metadata[self.metadata['steering'] != 0]
-		zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=0.5)
+
+		fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20,20))
+		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), ax=axes[0], label='raw')
+		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
+		
+
+		frac = 0.025
+		if False:
+			nonzero_df = self.metadata[self.metadata['steering'] != 0]
+			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
+		else:
+			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
+			filt = (self.metadata['steering'].abs() < 0.01)
+			filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
+			filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+
+			nonzero_df = self.metadata[~filt]
+			zero_df = self.metadata[filt].sample(frac=frac)
+
+		# how to choose the fraction
+		# max(np.histogram(self.metadata.loc[~filt, "steering"], bins=int(np.sqrt(len(self.metadata))))[0])
+
 		self.metadata = pd.concat([zero_df, nonzero_df], axis='rows')
 
+		# oversample > 25 deg
+		filt_large_angle = (self.metadata['steering'] > 24.5 * np.pi / 180)
+		filt_large_angle |= (self.metadata['steering'] < -20 * np.pi / 180)
+		dups = self.metadata[filt_large_angle]
+		self.metadata = pd.concat([self.metadata, dups, dups], axis='rows', ignore_index=True)
 
+		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant		
 		self.metadata.loc[:, 'flip'] = False
+		filt = (self.metadata['steering'].abs() < 0.01)
+		filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
+		filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
 
-		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant
-		flip_md = self.metadata[self.metadata['steering'].abs() < 0.01]
+		flip_md = self.metadata[filt]
 		flip_md.loc[:, 'flip'] = True
 		self.metadata = pd.concat([self.metadata, flip_md], axis='rows', ignore_index=True)
 
+		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), color='r', alpha=0.5, ax=axes[0], label='preprocessing')
+		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], color='r', alpha=0.5, label='preprocessing')
+		axes[0].legend()
+		axes[1].legend()
+		plt.savefig("output_images/1_steering_histogram.png".format(sub_folder))
 
-
+		plt.close(fig)
 		if shuffle:
 			self.shuffle() # = self.metadata.sample(frac=1)
 
