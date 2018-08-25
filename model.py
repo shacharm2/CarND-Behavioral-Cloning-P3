@@ -5,7 +5,7 @@
 """
 import sys
 import data_server
-import tensorflow as tf
+#import tensorflow as tf
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten
 from keras import backend
@@ -35,7 +35,7 @@ def nvidia_model(in_shape):
 	#input_img = Input(shape=in_shape)
 	model = Sequential()
 
-	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
+	model.add(Cropping2D(cropping=((70, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
 
 	model.add(Conv2D(3, (5, 5), activation='relu'))

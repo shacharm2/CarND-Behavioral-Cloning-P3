@@ -1,7 +1,9 @@
 """ This module generates data 
 
-	resources: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly.html
-
+	resources:
+		https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly.html
+		https://arxiv.org/pdf/1710.05381.pdf
+			
 """
 
 
@@ -32,25 +34,42 @@ class Process(object, metaclass=Singleton):
 	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.7):
 		self.data_folder = data_folder
 		self.folders = []
+		
+		self.out_folder = "output_images"
 
 		submetadata = []
 		for sub_folder in os.listdir(self.data_folder):
 			curr_dir = os.path.join(self.data_folder, sub_folder)
 			if not os.path.isdir(curr_dir):
 				continue
+
+			self.folders.append(curr_dir)
 			csv_metadata = os.path.join(curr_dir, 'driving_log.csv')
 
+			fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(20,20))
+
 			metadata_i = pd.read_csv(csv_metadata)
-			temp = pd.DataFrame(index=metadata_i.index)
 			alpha = {'left': .25, 'center': 0, 'right': -.25}
-			for direction in ['center', 'left', 'right']:
+			for ndir, direction in enumerate(sorted(alpha)):  #['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
-				concat = pd.concat([abs_paths, metadata_i['steering'] + alpha[direction]], axis='columns')
+				steering_angle = (metadata_i['steering'] + alpha[direction])
+				steering_angle.plot(linewidth=2, color='b', ax=axes[ndir], label='raw', alpha=0.5)
+				axes[ndir].fill_between(steering_angle.index, 0, steering_angle, color='b', alpha=0.5)
+
+				steering_angle = steering_angle.rolling(4, center=True).mean()
+				steering_angle.plot(linewidth=2, color='tab:olive', ax=axes[ndir], label='interp', alpha=0.8)
+				axes[ndir].set_title(direction)
+				axes[ndir].legend()
+
+				concat = pd.concat([abs_paths, steering_angle], axis='columns')
 				concat.columns = ['image', 'steering']
 				submetadata.append(concat)
+			else:
+				plt.savefig("output_images/1_steerings_{}.png".format(sub_folder))
+				# plt.show()
+		plt.close(fig)
 
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
-
 		# reduce 0 angle samples
 		nonzero_df = self.metadata[self.metadata['steering'] != 0]
 		zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=0.5)
