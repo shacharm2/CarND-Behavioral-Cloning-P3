@@ -8,21 +8,25 @@
 
 
 import os
-import pandas as pd
-from sklearn.model_selection import train_test_split
-import cv2
-import numpy as np
-from PIL import Image
-from io import BytesIO
-import ipdb
-import numpy as np
 import base64
-import matplotlib
-matplotlib.use('Agg')
+from io import BytesIO
 
-from matplotlib import pyplot as plt
-
+import numpy as np
+import pandas as pd
+import cv2
+from sklearn.model_selection import train_test_split
 import keras
+from keras.models import Model, Sequential, load_model
+from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten
+from PIL import Image
+import matplotlib
+print(matplotlib.get_backend())
+if not "DISPLAY" in os.environ:
+	matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+import ipdb
+
+
 
 class Singleton(type):
 	""" https://stackoverflow.com/questions/6760685/creating-a-singleton-in-python
@@ -139,8 +143,56 @@ class Process(object, metaclass=Singleton):
 		self.metadata.loc[val_idx, 'train_type'] = 'valid'
 		self.metadata.loc[test_idx, 'train_type'] = 'test'
 
-	def angle_statistics(self):
-		ipdb.set_trace()
+		# save 
+		for _ in range(10):
+			random_image = np.random.randint(len(self.metadata))
+
+			al = self.metadata.loc[random_image, 'steering']
+			full_image_name = self.metadata.loc[random_image, 'image']
+			image_name = os.path.splitext(os.path.split(full_image_name)[-1])[0]
+			image = np.asarray(Image.open(full_image_name))
+			
+			p0 = np.array((image.shape[0], image.shape[1] / 2))
+			dy = 0.2 * image.shape[0] # pixels
+			# tan(al) = dx/dy 
+			dx = dy * np.tan(al)
+			p1 = p0 + np.array((dx, -dy))
+
+			self.imshow_cropped(image, image_name=image_name, velocity=(p0, p1, al), save=True)
+
+	@staticmethod
+	def imshow_cropped(image, image_name=None, velocity=None, save=False, show=False):
+		fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20,20))
+		model = Sequential()
+		model.add(Cropping2D(cropping=((70, 25), (0,0)), input_shape=image.shape))
+
+		cropped_output = keras.backend.function([model.layers[0].input], [model.layers[0].output])
+		new_image = cropped_output([image[None,...]])[0]
+		axes[0].imshow(image / 255, cmap='gray')
+		if velocity is not None:
+			p0, p1, al = velocity
+			X = np.array([p1[0], p0[0]])
+			Y = np.array([p1[1], p0[1]])
+			# U = np.sin(X)
+			# V = np.cos(Y)
+			# axes[0].quiver(X, Y, U, V)
+			# ipdb.set_trace()
+			
+			axes[0].plot(X, Y, linewidth=10)
+			axes[0].set_title("steeing {0:2.1f}".format(al * 180 / np.pi))
+
+		axes[1].imshow(new_image[0, ...] / 255, cmap='gray')
+
+		if show:
+			plt.show()
+		
+		if save and image_name is None:
+			plt.savefig('output_images/1_cropped.png', bbox_inches='tight')
+		elif save:
+			plt.savefig('output_images/1_cropped_{}.png'.format(image_name), bbox_inches='tight')
+			
+
+		plt.close(fig)
 
 	def shuffle(self):
 		""" """
