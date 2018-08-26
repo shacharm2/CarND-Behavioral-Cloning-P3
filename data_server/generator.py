@@ -56,7 +56,7 @@ class Process(object, metaclass=Singleton):
 
 			# metadata_i['flip'] = False
 			# metadata_i.loc[metadata_i['steering'].abs() < 0.01, 'flip'] = True
-			
+
 
 			side_camera_bias = .25
 			alpha = {'left': side_camera_bias, 'center': 0, 'right': -side_camera_bias}
@@ -67,7 +67,7 @@ class Process(object, metaclass=Singleton):
 				axes[ndir].fill_between(steering_angle.index, 0, steering_angle, color='b', alpha=0.5)
 
 				steering_angle = steering_angle.rolling(4, center=True).mean().fillna(method='ffill').fillna(method='bfill')
-				
+
 				steering_angle.plot(linewidth=2, color='tab:olive', ax=axes[ndir], label='interp', alpha=0.8)
 				axes[ndir].set_title(direction)
 				axes[ndir].legend()
@@ -86,7 +86,6 @@ class Process(object, metaclass=Singleton):
 		fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20,20))
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), ax=axes[0], label='raw')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
-		
 
 		frac = 0.025
 		if False:
@@ -244,7 +243,7 @@ def batch_generator(train_type='train', batch_size=None):
 		if i_batch % batch_size == batch_size - 1:
 			yield batch_x, batch_y
 			batch_x, batch_y = None, None
-		
+i
 		i_batch += 1
 		print(len(batch_x))
 
