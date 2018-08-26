@@ -37,6 +37,10 @@ class Singleton(type):
 			cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
 		return cls._instances[cls]
 
+def preprocess(image):
+	img = cv2.GaussianBlur(image, (3,3), 0)
+	return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
+
 class Process(object, metaclass=Singleton):
 
 	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.7):
@@ -70,7 +74,7 @@ class Process(object, metaclass=Singleton):
 				steering_angle.plot(linewidth=2, color='b', ax=axes[ndir], label='raw', alpha=0.5)
 				axes[ndir].fill_between(steering_angle.index, 0, steering_angle, color='b', alpha=0.5)
 
-				steering_angle = steering_angle.rolling(4, center=True).mean().fillna(method='ffill').fillna(method='bfill')
+				steering_angle = steering_angle.rolling(5, center=True).mean().fillna(method='ffill').fillna(method='bfill')
 
 				steering_angle.plot(linewidth=2, color='tab:olive', ax=axes[ndir], label='interp', alpha=0.8)
 				axes[ndir].set_title(direction)
@@ -118,8 +122,8 @@ class Process(object, metaclass=Singleton):
 		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant		
 		self.metadata.loc[:, 'flip'] = False
 		filt = (self.metadata['steering'].abs() < 0.01)
-		filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-		filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+		# filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
+		# filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
 
 		flip_md = self.metadata[filt]
 		flip_md.loc[:, 'flip'] = True
@@ -150,7 +154,8 @@ class Process(object, metaclass=Singleton):
 			al = self.metadata.loc[random_image, 'steering']
 			full_image_name = self.metadata.loc[random_image, 'image']
 			image_name = os.path.splitext(os.path.split(full_image_name)[-1])[0]
-			image = np.asarray(Image.open(full_image_name))
+			#image = np.asarray(Image.open(full_image_name))
+			image = self.open(full_image_name)
 
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
 			dy = 0.2 * image.shape[0] # pixels
@@ -222,14 +227,28 @@ class Process(object, metaclass=Singleton):
 
 		# (2) flip
 		if metadata['flip']:
-			# or .. flipped = cv2.flip(image, 1)
-			flipped = np.fliplr(image)
-			steering = - metadata['steering']
-			yield flipped, steering
+			yield self.flip(image, metadata['steering'])
+
+			# # or .. flipped = cv2.flip(image, 1)
+			# flipped = np.fliplr(image)
+			# steering = - metadata['steering']
+			# yield flipped, steering
+
 
 		# TODO: rotate ..
 		# TODO: sheer ..
 		# TODO: exagerate opposite angle and camera
+
+	@staticmethod
+	def open(image_file):
+		img = np.asarray(Image.open(image_file))
+		return preprocess(img)
+		#img = cv2.GaussianBlur(img, (3,3), 0)
+		# return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
+		
+	@staticmethod
+	def flip(image, angle):
+		return cv2.flip(image, 1), -angle   # cv2.flip(image, 1) or np.fliplr(image)
 
 	def get_indices(self, train_type, index, batch_size):
 		""" """
@@ -240,7 +259,8 @@ class Process(object, metaclass=Singleton):
 	def get(self, train_type):
 		""" """
 		for _, row in self.metadata[self.metadata['train_type'] == train_type].iterrows():
-			img = np.asarray(Image.open(row['image']))
+			#img = np.asarray(Image.open(row['image']))
+			img = self.open(row['image'])
 			for _x, _y in self.augment(img, row):
 				yield _x, _y
 
@@ -254,7 +274,8 @@ class Process(object, metaclass=Singleton):
 		# Generate data
 		for i, index in enumerate(indices):
 			row = self.metadata.loc[index]
-			img = np.asarray(Image.open(row['image']))
+			#img = np.asarray(Image.open(row['image']))
+			img = self.open(row['image'])
 
 			if X is None or y is None:
 				X = np.empty((batch_size, *img.shape))
