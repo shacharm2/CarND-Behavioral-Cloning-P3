@@ -8,25 +8,9 @@ import data_server
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten
-from keras import backend
 from matplotlib import pyplot as plt
 import numpy as np
 import ipdb
-
-def imshow_cropped(image, save=False, show=False):
-
-	model = Sequential()
-	model.add(Cropping2D(cropping=((50,25), (0,0)), input_shape=image.shape))
-
-	cropped_output = backend.function([model.layers[0].input], [model.layers[0].output])
-	new_image = cropped_output([image[None,...]])[0]
-
-	if save:
-		plt.savefig('cropped.png', bbox_inches='tight')
-
-	if show:
-		plt.imshow(new_image[0,...]/255, cmap='gray')
-		plt.show()
 
 #def Nvidia
 def nvidia_model(in_shape):
@@ -98,11 +82,10 @@ if __name__ == "__main__":
 	# ipdb.set_trace()
 	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
-	EPOCHS=10
+	EPOCHS = 10
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
 	# samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)
-
 
 	model.fit_generator(
 		generator=train_generator,
