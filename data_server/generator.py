@@ -65,12 +65,14 @@ class Process(object, metaclass=Singleton):
 			# metadata_i['flip'] = False
 			# metadata_i.loc[metadata_i['steering'].abs() < 0.01, 'flip'] = True
 
-
-			side_camera_bias = .25
+			
+			to_save = []
+			side_camera_bias = .3
 			alpha = {'left': side_camera_bias, 'center': 0, 'right': -side_camera_bias}
 			for ndir, direction in enumerate(sorted(alpha)):  #['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
 				steering_angle = (metadata_i['steering'] + alpha[direction])
+				to_save.append((abs_paths.iloc[0], steering_angle.iloc[0]))
 				steering_angle.plot(linewidth=2, color='b', ax=axes[ndir], label='raw', alpha=0.5)
 				axes[ndir].fill_between(steering_angle.index, 0, steering_angle, color='b', alpha=0.5)
 
@@ -87,10 +89,26 @@ class Process(object, metaclass=Singleton):
 				plt.savefig("output_images/1_steerings_{}.png".format(sub_folder))
 				# plt.show()
 		plt.close(fig)
-
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
-		# reduce 0 angle samples
 
+		fig, axes = plt.subplots(nrows=1, ncols=len(to_save), figsize=(20,20))
+		for i, (img_filename, al) in enumerate(to_save):
+			image = self.open(img_filename, preprocess_flag=False)
+			
+			p0 = np.array((image.shape[0], image.shape[1] / 2))
+
+			dy = 0.2 * image.shape[0] # pixels
+			dx = dy * np.tan(al)
+			p1 = p0 + np.array((dx, -dy))
+			X = np.array([p1[0], p0[0]])
+			Y = np.array([p1[1], p0[1]])
+			axes[i].imshow(image / 255, cmap='gray')
+			axes[i].plot(X, Y, linewidth=10)
+		else:
+			plt.savefig("output_images/1_three_views_{}.png".format(sub_folder))
+		plt.close(fig)
+
+		# reduce 0 angle samples
 		fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20,20))
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), ax=axes[0], label='raw')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
@@ -101,9 +119,11 @@ class Process(object, metaclass=Singleton):
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
 		else:
 			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
-			filt = (self.metadata['steering'].abs() < 0.01)
-			filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-			filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+			filt = (self.metadata['steering'].abs() == 0) #< 0.01)
+
+			# perhaps these shouldn't be removed
+			#filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
+			#filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
@@ -240,8 +260,10 @@ class Process(object, metaclass=Singleton):
 		# TODO: exagerate opposite angle and camera
 
 	@staticmethod
-	def open(image_file):
+	def open(image_file, preprocess_flag=True):
 		img = np.asarray(Image.open(image_file))
+		if not preprocess_flag:
+			return img
 		return preprocess(img)
 		#img = cv2.GaussianBlur(img, (3,3), 0)
 		# return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
