@@ -151,7 +151,7 @@ class Process(object, metaclass=Singleton):
 			full_image_name = self.metadata.loc[random_image, 'image']
 			image_name = os.path.splitext(os.path.split(full_image_name)[-1])[0]
 			image = np.asarray(Image.open(full_image_name))
-			
+
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
 			dy = 0.2 * image.shape[0] # pixels
 			# tan(al) = dx/dy 
@@ -177,7 +177,7 @@ class Process(object, metaclass=Singleton):
 			# V = np.cos(Y)
 			# axes[0].quiver(X, Y, U, V)
 			# ipdb.set_trace()
-			
+
 			axes[0].plot(X, Y, linewidth=10)
 			axes[0].set_title("steeing {0:2.1f}".format(al * 180 / np.pi))
 
@@ -185,12 +185,11 @@ class Process(object, metaclass=Singleton):
 
 		if show:
 			plt.show()
-		
+
 		if save and image_name is None:
 			plt.savefig('output_images/1_cropped.png', bbox_inches='tight')
 		elif save:
 			plt.savefig('output_images/1_cropped_{}.png'.format(image_name), bbox_inches='tight')
-			
 
 		plt.close(fig)
 
@@ -295,7 +294,7 @@ def batch_generator(train_type='train', batch_size=None):
 		if i_batch % batch_size == batch_size - 1:
 			yield batch_x, batch_y
 			batch_x, batch_y = None, None
-i
+
 		i_batch += 1
 		print(len(batch_x))
 
