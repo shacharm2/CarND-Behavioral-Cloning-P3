@@ -20,12 +20,12 @@ from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten
 from PIL import Image
 import matplotlib
-print(matplotlib.get_backend())
 if not "DISPLAY" in os.environ:
 	matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import ipdb
 
+print(matplotlib.get_backend())
 
 
 class Singleton(type):
@@ -332,7 +332,7 @@ class DataGenerator(keras.utils.Sequence):
 
 	def __getitem__(self, index):
 		indices = Process().get_indices(self.train_type, index, self.batch_size)
-		
+
 		# Generate data
 		X, y = Process().data_generation(indices, self.batch_size)
 		#data_generation(self, indices, batch_size, height, width, nchannels):
@@ -347,7 +347,7 @@ class DataGenerator(keras.utils.Sequence):
 
 if __name__ == '__main__':
 
-	BATCH_SIZE = 128
+	BATCH_SIZE = 64
 	data_gen = DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	print(data_gen[1])
 	print(len(data_gen))
