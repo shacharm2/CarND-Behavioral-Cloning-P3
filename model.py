@@ -61,10 +61,12 @@ def nvidia_model(in_shape):
 
 	print(model.summary())
 
-
-
 	model.compile(loss="mse", optimizer="adam")
-	return model
+	params = {}
+	params["EPOCHS"] = 10
+	params["BATCH_SIZE"] = 64
+
+	return model, params
 
 
 def test_model(in_shape, show=False):
@@ -83,25 +85,29 @@ def test_model(in_shape, show=False):
 	model.add(Dense(1))
 
 	model.compile(loss="mse", optimizer="adam")
-	return model
+	
+	params = {}
+	params["EPOCHS"] = 3
+	params["BATCH_SIZE"] = 64
+	return model, params
 
 def generate_model(model_name, in_shape):
 	if model_name == "test":
-		model = test_model(in_shape)
+		model, params = test_model(in_shape)
 	elif model_name == "nvidia":
-		model = nvidia_model(in_shape)
+		model, params = nvidia_model(in_shape)
 	else:
 		raise Exception("select test/nvidia models")
-	return model
+	return model, params
 
 if __name__ == "__main__":
 	model_name = "nvidia"
 	if len(sys.argv) > 1:
 		model_name = sys.argv[-1]
 
-	model = generate_model(model_name="test", in_shape=(160, 320, 3))
-
-	BATCH_SIZE = 64
+	model, params = generate_model(model_name="test", in_shape=(160, 320, 3))
+	EPOCHS = params["EPOCHS"]
+	BATCH_SIZE = params["BATCH_SIZE"]
 	# train_generator = data_server.batch_generator(train_type='train', batch_size=BATCH_SIZE)
 	# validation_generator  = data_server.batch_generator(train_type='valid', batch_size=BATCH_SIZE)
 	# for batch_x, batch_y in train_generator:
@@ -112,7 +118,7 @@ if __name__ == "__main__":
 	# ipdb.set_trace()
 	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
-	EPOCHS = 30
+	
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
 	# samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)

@@ -124,7 +124,7 @@ class Process(object, metaclass=Singleton):
 		fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20,20))
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), ax=axes[0], label='raw')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
-		max_angle = self.metadata['steering'].abs().max()
+		self.max_train_angle = self.metadata['steering'].abs().max()
 
 		frac = 0.05
 		if False:
@@ -282,7 +282,7 @@ class Process(object, metaclass=Singleton):
 		axes[0][1].set_title('cropped')
 		
 		if velocity is not None:
-			sheared, shear_angle = self.shear(image, velocity[2], self.metadata['steering'].abs().max())
+			sheared, shear_angle = self.shear(image, velocity[2])
 			axes[1][0].imshow(sheared, cmap='gray')
 
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
@@ -368,9 +368,10 @@ class Process(object, metaclass=Singleton):
 		return cv2.flip(image, 1), -steering_angle   # cv2.flip(image, 1) or np.fliplr(image)
 
 	@staticmethod
-	def shear(image, steering_angle, max_angle):
-		angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
-		a = min(max_angle, np.random.uniform(abs(steering_angle), max_angle))
+	def shear(image, steering_angle):
+		angle_range = sorted([steering_angle, self.max_train_angle * np.sign(steering_angle)])
+		abs_angle = abs(steering_angle)
+		a = min(self.max_train_angle, np.random.uniform(abs_angle, self.max_train_angle))
 		steering_angle_out = a * np.sign(steering_angle)
 
 		rows, cols = image.shape[:2]
