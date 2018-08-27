@@ -138,8 +138,9 @@ if __name__ == "__main__":
 		model.save_weights('model_weights.h5')
 
 
-	#model = load_model('model.h5')
-	data_server.Process().dump_metadata()
-	#model.save_weights('model_weights.h5')
 	model.load_weights('model_weights.h5', by_name=True)
-	model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
+	if not os.path.exists("model.h5"):
+		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
+
+	
+
