@@ -27,7 +27,7 @@ from matplotlib import pyplot as plt
 import ipdb
 
 print(matplotlib.get_backend())
-
+np.random.seed(42)
 
 class Singleton(type):
 	""" https://stackoverflow.com/questions/6760685/creating-a-singleton-in-python
@@ -38,9 +38,20 @@ class Singleton(type):
 			cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
 		return cls._instances[cls]
 
+saved_once = False
 def preprocess(image):
-	img = cv2.GaussianBlur(image, (3,3), 0)
-	return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
+	# HSV/LAB/YUV
+	global saved_once
+	img = cv2.GaussianBlur(np.array(image), (3,3), 0)
+	output = cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
+	if not saved_once:
+		fig = plt.figure()
+		plt.imshow(output / 255, cmap='gray')
+		plt.savefig("output_images/preprocessed_{}.png".format(np.random.randint(1000)))
+		plt.close(fig)
+		saved_once = True
+
+	return output
 
 class Process(object, metaclass=Singleton):
 
@@ -113,9 +124,9 @@ class Process(object, metaclass=Singleton):
 		fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20,20))
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), ax=axes[0], label='raw')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
-		max_angle = self.metadata['steering'].abs().max()
-		
-		frac = 0.025
+		self.max_train_angle = self.metadata['steering'].abs().max()
+
+		frac = 0.05
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
@@ -204,7 +215,7 @@ class Process(object, metaclass=Singleton):
 		# self.metadata.loc[test_idx, 'train_type'] = 'test'
 
 		# save 
-		for _ in range(10):
+		for _ in range(2):
 			random_image = np.random.randint(len(self.metadata))
 
 			al = self.metadata.loc[random_image, 'steering']
@@ -215,11 +226,12 @@ class Process(object, metaclass=Singleton):
 
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
 			dy = 0.2 * image.shape[0] # pixels
-			# tan(al) = dx/dy 
-			dx = dy * np.tan(al)
+			dx = dy * np.tan(al)	# tan(al) = dx/dy 
 			p1 = p0 + np.array((dx, -dy))
 
 			self.imshow_augmentations(image, image_name=image_name, velocity=(p0, p1, al), save=True)
+		else:
+			image = self.open(self.metadata.loc[0, 'image'])
 
 	def split(self, shuffle=True, train_size=0.7):
 		""" train/valid/test split """
@@ -270,7 +282,7 @@ class Process(object, metaclass=Singleton):
 		axes[0][1].set_title('cropped')
 		
 		if velocity is not None:
-			sheared, shear_angle = self.shear(image, velocity[2], self.metadata['steering'].abs().max())
+			sheared, shear_angle = self.shear(image, velocity[2], self.max_train_angle)
 			axes[1][0].imshow(sheared, cmap='gray')
 
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
@@ -336,9 +348,10 @@ class Process(object, metaclass=Singleton):
 			# steering = - metadata['steering']
 			# yield flipped, steering
 
+		if metadata['shear']:
+			yield self.shear(image, metadata['steering'], self.max_train_angle)
 
 		# TODO: rotate ..
-		# TODO: sheer ..
 		# TODO: exagerate opposite angle and camera
 
 	@staticmethod
@@ -357,7 +370,8 @@ class Process(object, metaclass=Singleton):
 	@staticmethod
 	def shear(image, steering_angle, max_angle):
 		angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
-		a = min(max_angle, np.random.uniform(abs(steering_angle), max_angle))
+		abs_angle = abs(steering_angle)
+		a = np.random.uniform(abs_angle, max_angle)
 		steering_angle_out = a * np.sign(steering_angle)
 
 		rows, cols = image.shape[:2]
