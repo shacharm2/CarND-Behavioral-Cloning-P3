@@ -3,6 +3,7 @@
 	resources:
 		https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly.html
 		https://arxiv.org/pdf/1710.05381.pdf
+		http://scikit-image.org/docs/dev/auto_examples/transform/plot_register_translation.html
 
 """
 
@@ -46,7 +47,7 @@ class Process(object, metaclass=Singleton):
 	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.7):
 		self.data_folder = data_folder
 		self.folders = []
-
+		self.draw_one = {'flip': False, 'shear': False}
 		self.out_folder = "output_images"
 
 		submetadata = []
@@ -94,7 +95,7 @@ class Process(object, metaclass=Singleton):
 		fig, axes = plt.subplots(nrows=1, ncols=len(to_save), figsize=(20,20))
 		for i, (img_filename, al) in enumerate(to_save):
 			image = self.open(img_filename, preprocess_flag=False)
-			
+
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
 
 			dy = 0.2 * image.shape[0] # pixels
@@ -105,25 +106,34 @@ class Process(object, metaclass=Singleton):
 			axes[i].imshow(image / 255, cmap='gray')
 			axes[i].plot(X, Y, linewidth=10)
 		else:
-			plt.savefig("output_images/1_three_views_{}.png".format(sub_folder))
+			plt.savefig("output_images/1_three_views_{}.png".format(sub_folder), bbox_inches='tight')
 		plt.close(fig)
 
 		# reduce 0 angle samples
 		fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20,20))
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), ax=axes[0], label='raw')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
-
+		max_angle = self.metadata['steering'].abs().max()
+		
 		frac = 0.025
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
-		else:
+		elif True:
 			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
-			filt = (self.metadata['steering'].abs() == 0) #< 0.01)
+			filt = (self.metadata['steering'].abs() < 0.01)
 
 			# perhaps these shouldn't be removed
-			#filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-			#filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+			filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
+			filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+
+			nonzero_df = self.metadata[~filt]
+			zero_df = self.metadata[filt].sample(frac=frac)
+		else:
+			filt = self.metadata['steering'].abs().eq(0)
+
+			# perhaps these shouldn't be removed
+			filt |= self.metadata['steering'].abs().eq(side_camera_bias)
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
@@ -133,21 +143,45 @@ class Process(object, metaclass=Singleton):
 
 		self.metadata = pd.concat([zero_df, nonzero_df], axis='rows')
 
-		# oversample > 25 deg
-		filt_large_angle = (self.metadata['steering'] > 24.5 * np.pi / 180)
-		filt_large_angle |= (self.metadata['steering'] < -20 * np.pi / 180)
-		dups = self.metadata[filt_large_angle]
-		self.metadata = pd.concat([self.metadata, dups, dups], axis='rows', ignore_index=True)
+		self.split(shuffle, train_size)
+		# if shuffle:
+		# 	self.shuffle() # = self.metadata.sample(frac=1)
+		
+		# self.metadata.loc[: ,'type'] = None
+		# train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
+		# val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
 
+		# self.metadata.loc[train_idx, 'train_type'] = 'train'
+		# self.metadata.loc[val_idx, 'train_type'] = 'valid'
+		# self.metadata.loc[test_idx, 'train_type'] = 'test'
+
+		#train_filt = (self.metadata.loc[train_idx, 'train_type'] == 'train')
+		train_filt = self.metadata['train_type'].eq('train')
+
+		## augmentations ##
+		# oversample > 25 deg
+		#(self.metadata['steering'] > 24.5 * np.pi / 180)
+		filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
+		filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
+		dups = self.metadata[filt_large_angle & train_filt]
+		self.metadata = pd.concat([self.metadata, dups], axis='rows', ignore_index=True)
+		
+		
 		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant		
 		self.metadata.loc[:, 'flip'] = False
-		filt = (self.metadata['steering'].abs() < 0.01)
+		self.metadata.loc[:, 'shear'] = False
+		#filt = train_filt & (self.metadata['steering'].abs() < 0.01)
+		filt = train_filt & self.metadata['steering'].abs().lt(0.01)
 		# filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
 		# filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
 
 		flip_md = self.metadata[filt]
 		flip_md.loc[:, 'flip'] = True
-		self.metadata = pd.concat([self.metadata, flip_md], axis='rows', ignore_index=True)
+
+		shear_md = self.metadata[filt]
+		shear_md.loc[:, 'shear'] = True
+
+		self.metadata = pd.concat([self.metadata, flip_md, shear_md], axis='rows', ignore_index=True)
 
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), color='r', alpha=0.5, ax=axes[0], label='preprocessing')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], color='r', alpha=0.5, label='preprocessing')
@@ -156,16 +190,18 @@ class Process(object, metaclass=Singleton):
 		plt.savefig("output_images/1_steering_histogram.png".format(sub_folder))
 
 		plt.close(fig)
-		if shuffle:
-			self.shuffle() # = self.metadata.sample(frac=1)
+		self.metadata[self.metadata['shear']].iloc[0]
 
-		self.metadata.loc[: ,'type'] = None
-		train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
-		val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
+		# if shuffle:
+		# 	self.shuffle() # = self.metadata.sample(frac=1)
 
-		self.metadata.loc[train_idx, 'train_type'] = 'train'
-		self.metadata.loc[val_idx, 'train_type'] = 'valid'
-		self.metadata.loc[test_idx, 'train_type'] = 'test'
+		# self.metadata.loc[: ,'type'] = None
+		# train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
+		# val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
+
+		# self.metadata.loc[train_idx, 'train_type'] = 'train'
+		# self.metadata.loc[val_idx, 'train_type'] = 'valid'
+		# self.metadata.loc[test_idx, 'train_type'] = 'test'
 
 		# save 
 		for _ in range(10):
@@ -175,7 +211,7 @@ class Process(object, metaclass=Singleton):
 			full_image_name = self.metadata.loc[random_image, 'image']
 			image_name = os.path.splitext(os.path.split(full_image_name)[-1])[0]
 			#image = np.asarray(Image.open(full_image_name))
-			image = self.open(full_image_name)
+			image = self.open(full_image_name, preprocess_flag=False)
 
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
 			dy = 0.2 * image.shape[0] # pixels
@@ -183,30 +219,76 @@ class Process(object, metaclass=Singleton):
 			dx = dy * np.tan(al)
 			p1 = p0 + np.array((dx, -dy))
 
-			self.imshow_cropped(image, image_name=image_name, velocity=(p0, p1, al), save=True)
+			self.imshow_augmentations(image, image_name=image_name, velocity=(p0, p1, al), save=True)
 
-	@staticmethod
-	def imshow_cropped(image, image_name=None, velocity=None, save=False, show=False):
-		fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20,20))
+	def split(self, shuffle=True, train_size=0.7):
+		""" train/valid/test split """
+		if shuffle:
+			self.shuffle() # = self.metadata.sample(frac=1)
+		
+		self.metadata.loc[: ,'type'] = None
+		train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
+		val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
+
+		self.metadata.loc[train_idx, 'train_type'] = 'train'
+		self.metadata.loc[val_idx, 'train_type'] = 'valid'
+		self.metadata.loc[test_idx, 'train_type'] = 'test'
+
+	def imshow_augmentations(self, image, image_name=None, velocity=None, save=False, show=False):
+		fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20,20))
 		model = Sequential()
 		model.add(Cropping2D(cropping=((70, 25), (0,0)), input_shape=image.shape))
 
 		cropped_output = keras.backend.function([model.layers[0].input], [model.layers[0].output])
 		new_image = cropped_output([image[None,...]])[0]
-		axes[0].imshow(image / 255, cmap='gray')
+		for iimg in [0, 2]:
+			axes[iimg][0].imshow(image / 255, cmap='gray')
+			axes[iimg][0].set_title('raw')
+
 		if velocity is not None:
 			p0, p1, al = velocity
 			X = np.array([p1[0], p0[0]])
 			Y = np.array([p1[1], p0[1]])
-			# U = np.sin(X)
-			# V = np.cos(Y)
-			# axes[0].quiver(X, Y, U, V)
-			# ipdb.set_trace()
+			for iimg in [0, 2]:
+				axes[iimg][0].plot(X, Y, linewidth=10)
+				axes[iimg][0].set_title("steering {0:2.1f}".format(al * 180 / np.pi))
+				
+			# flip
+			flipped, flip_al = self.flip(image, al)
+			p0 = np.array((image.shape[0], image.shape[1] / 2))
+			dy = 0.2 * image.shape[0]
+			dx = dy * np.tan(flip_al)
+			p1 = p0 + np.array((dx, -dy))
+			X = np.array([p1[0], p0[0]])
+			Y = np.array([p1[1], p0[1]])
 
-			axes[0].plot(X, Y, linewidth=10)
-			axes[0].set_title("steeing {0:2.1f}".format(al * 180 / np.pi))
+			axes[2][1].imshow(flipped / 255, cmap='gray')
+			axes[2][1].plot(X, Y, linewidth=10)
+			axes[2][1].set_title("steering {0:2.1f}".format(flip_al * 180 / np.pi))
 
-		axes[1].imshow(new_image[0, ...] / 255, cmap='gray')
+		axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
+		axes[0][1].set_title('cropped')
+		
+		if velocity is not None:
+			sheared, shear_angle = self.shear(image, velocity[2], self.metadata['steering'].abs().max())
+			axes[1][0].imshow(sheared, cmap='gray')
+
+			p0 = np.array((image.shape[0], image.shape[1] / 2))
+			dy = 0.2 * image.shape[0]
+			dx = dy * np.tan(shear_angle)
+			p1 = p0 + np.array((dx, -dy))
+			X = np.array([p1[0], p0[0]])
+			Y = np.array([p1[1], p0[1]])
+			axes[1][0].plot(X, Y, linewidth=10)
+			axes[1][0].set_title("steering {0:2.1f}".format(shear_angle * 180 / np.pi))
+
+			model = Sequential()
+			model.add(Cropping2D(cropping=((70, 25), (0,0)), input_shape=image.shape))
+
+			cropped_output = keras.backend.function([model.layers[0].input], [model.layers[0].output])
+			sheared_cropped = cropped_output([sheared[None,...]])[0]
+			axes[1][1].imshow(sheared_cropped[0, ...] / 255, cmap='gray')
+			axes[1][1].set_title('sheared cropped')
 
 		if show:
 			plt.show()
@@ -269,8 +351,42 @@ class Process(object, metaclass=Singleton):
 		# return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
 		
 	@staticmethod
-	def flip(image, angle):
-		return cv2.flip(image, 1), -angle   # cv2.flip(image, 1) or np.fliplr(image)
+	def flip(image, steering_angle):
+		return cv2.flip(image, 1), -steering_angle   # cv2.flip(image, 1) or np.fliplr(image)
+
+	@staticmethod
+	def shear(image, steering_angle, max_angle):
+		angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
+		a = min(max_angle, np.random.uniform(abs(steering_angle), max_angle))
+		steering_angle_out = a * np.sign(steering_angle)
+
+		rows, cols = image.shape[:2]
+		# around middle point
+		dx = 0.5 * rows * np.tan(steering_angle_out)
+		shifted = [0.5 * cols + dx, 0.5 * rows]
+		pt_in = np.float32([[0, rows],[cols,rows], [cols / 2, rows / 2]])
+		pt_out = np.float32([[0, rows],[cols,rows], shifted])
+		M = cv2.getAffineTransform(pt_in, pt_out)
+		image = cv2.warpAffine(image, M, (cols, rows), borderMode=cv2.BORDER_REPLICATE)
+
+		return image, steering_angle_out
+
+
+
+		
+
+
+		# rows,cols,ch = image.shape
+		# dx = np.random.randint(-shear_range,shear_range+1)
+		# #    print('dx',dx)
+		# random_point = [cols/2+dx,rows/2]
+		# pts1 = np.float32([[0,rows],[cols,rows],[cols/2,rows/2]])
+		# pts2 = np.float32([[0,rows],[cols,rows],random_point])
+		# dsteering = dx/(rows/2) * 360/(2*np.pi*25.0) / 6.0    
+		# M = cv2.getAffineTransform(pts1,pts2)
+		# image = cv2.warpAffine(image,M,(cols,rows),borderMode=1)
+		# steering +=dsteering
+    
 
 	def get_indices(self, train_type, index, batch_size):
 		""" """
