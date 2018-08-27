@@ -75,11 +75,10 @@ def test_model(in_shape, show=False):
 
 	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
-	model.add(Conv2D(36, (3, 3), activation='relu'))
+	model.add(Conv2D(3, (3, 3), activation='relu'))
 	model.add(Conv2D(24, (3, 3), activation='relu'))
-	model.add(Conv2D(12, (3, 3), activation='relu'))
 	model.add(Flatten())
-	model.add(Dense(32, activation='relu', W_regularizer=l2(1e-3)))
+	model.add(Dense(32))
 	model.add(Dense(1))
 
 	model.compile(loss="mse", optimizer="adam")
@@ -112,7 +111,7 @@ if __name__ == "__main__":
 	# ipdb.set_trace()
 	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
-	EPOCHS = 25
+	EPOCHS = 15
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
 	# samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)
