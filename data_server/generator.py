@@ -282,7 +282,7 @@ class Process(object, metaclass=Singleton):
 		axes[0][1].set_title('cropped')
 		
 		if velocity is not None:
-			sheared, shear_angle = self.shear(image, velocity[2])
+			sheared, shear_angle = self.shear(image, velocity[2], self.max_train_angle)
 			axes[1][0].imshow(sheared, cmap='gray')
 
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
@@ -349,7 +349,7 @@ class Process(object, metaclass=Singleton):
 			# yield flipped, steering
 
 		if metadata['shear']:
-			yield self.shear(image, metadata['steering'])
+			yield self.shear(image, metadata['steering'], self.max_train_angle)
 
 		# TODO: rotate ..
 		# TODO: exagerate opposite angle and camera
@@ -368,10 +368,10 @@ class Process(object, metaclass=Singleton):
 		return cv2.flip(image, 1), -steering_angle   # cv2.flip(image, 1) or np.fliplr(image)
 
 	@staticmethod
-	def shear(image, steering_angle):
-		angle_range = sorted([steering_angle, self.max_train_angle * np.sign(steering_angle)])
+	def shear(image, steering_angle, max_angle):
+		angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
 		abs_angle = abs(steering_angle)
-		a = min(self.max_train_angle, np.random.uniform(abs_angle, self.max_train_angle))
+		a = np.random.uniform(abs_angle, max_angle)
 		steering_angle_out = a * np.sign(steering_angle)
 
 		rows, cols = image.shape[:2]
