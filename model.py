@@ -3,17 +3,21 @@
 
 
 """
+import os
 import sys
-import data_server
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation
 from keras.regularizers import l2
 
+import matplotlib
+if not "DISPLAY" in os.environ:
+	matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import numpy as np
 import ipdb
 
+import data_server
 
 #def Nvidia
 def nvidia_model(in_shape):
@@ -119,23 +123,23 @@ if __name__ == "__main__":
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
 	# samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)
+	if not os.path.exists("model.h5") or not os.path.exists("model_weights.h5"):
+		model.fit_generator(
+			generator=train_generator,
+			verbose=1,
+			validation_data=valid_generator,
+			validation_steps=validation_steps,
+			epochs=EPOCHS)
+			#		max_queue_size=10,
+			#		workers=3,
+			#		use_multiprocessing=True)
 
-	model.fit_generator(
-		generator=train_generator,
-		verbose=1,
-		validation_data=valid_generator,
-		validation_steps=validation_steps,
-		epochs=EPOCHS),
-#		max_queue_size=10,
-#		workers=3,
-#		use_multiprocessing=True)
+		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
+		model.save_weights('model_weights.h5')
 
-	model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
+
+	#model = load_model('model.h5')
+	data_server.Process().dump_metadata()
 	#model.save_weights('model_weights.h5')
-
-	del model  # deletes the existing model
-
-	model = load_model('model.h5')
-	# model.load_weights('my_model_weights.h5', by_name=True)
-
-	ipdb.set_trace()
+	model.load_weights('model_weights.h5', by_name=True)
+	model.save('model.h5')  # creates a HDF5 file 'my_model.h5'

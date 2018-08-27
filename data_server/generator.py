@@ -55,7 +55,7 @@ def preprocess(image):
 
 class Process(object, metaclass=Singleton):
 
-	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.7):
+	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.8):
 		self.data_folder = data_folder
 		self.folders = []
 		self.draw_one = {'flip': False, 'shear': False}
@@ -157,7 +157,6 @@ class Process(object, metaclass=Singleton):
 		self.split(shuffle, train_size)
 		# if shuffle:
 		# 	self.shuffle() # = self.metadata.sample(frac=1)
-		
 		# self.metadata.loc[: ,'type'] = None
 		# train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
 		# val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
@@ -237,7 +236,7 @@ class Process(object, metaclass=Singleton):
 		""" train/valid/test split """
 		if shuffle:
 			self.shuffle() # = self.metadata.sample(frac=1)
-		
+
 		self.metadata.loc[: ,'type'] = None
 		train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
 		val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
@@ -245,6 +244,10 @@ class Process(object, metaclass=Singleton):
 		self.metadata.loc[train_idx, 'train_type'] = 'train'
 		self.metadata.loc[val_idx, 'train_type'] = 'valid'
 		self.metadata.loc[test_idx, 'train_type'] = 'test'
+		self.dump_metadata()
+
+	def dump_metadata(self):
+		self.metadata.to_hdf("metadata.hdf", key="metadata")
 
 	def imshow_augmentations(self, image, image_name=None, velocity=None, save=False, show=False):
 		fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20,20))
@@ -264,7 +267,7 @@ class Process(object, metaclass=Singleton):
 			for iimg in [0, 2]:
 				axes[iimg][0].plot(X, Y, linewidth=10)
 				axes[iimg][0].set_title("steering {0:2.1f}".format(al * 180 / np.pi))
-				
+
 			# flip
 			flipped, flip_al = self.flip(image, al)
 			p0 = np.array((image.shape[0], image.shape[1] / 2))
