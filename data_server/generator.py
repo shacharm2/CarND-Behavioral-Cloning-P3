@@ -24,6 +24,7 @@ import matplotlib
 if not "DISPLAY" in os.environ:
 	matplotlib.use('Agg')
 from matplotlib import pyplot as plt
+from shutil  import copyfile
 import ipdb
 
 print(matplotlib.get_backend())
@@ -76,10 +77,8 @@ class Process(object, metaclass=Singleton):
 
 			# metadata_i['flip'] = False
 			# metadata_i.loc[metadata_i['steering'].abs() < 0.01, 'flip'] = True
-
-			
 			to_save = []
-			side_camera_bias = .3
+			side_camera_bias = .25
 			alpha = {'left': side_camera_bias, 'center': 0, 'right': -side_camera_bias}
 			for ndir, direction in enumerate(sorted(alpha)):  #['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
@@ -126,7 +125,7 @@ class Process(object, metaclass=Singleton):
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
 		self.max_train_angle = self.metadata['steering'].abs().max()
 
-		frac = 0.05
+		frac = 0.1
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
@@ -171,12 +170,14 @@ class Process(object, metaclass=Singleton):
 		## augmentations ##
 		# oversample > 25 deg
 		#(self.metadata['steering'] > 24.5 * np.pi / 180)
-		filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
-		filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
-		dups = self.metadata[filt_large_angle & train_filt]
-		self.metadata = pd.concat([self.metadata, dups], axis='rows', ignore_index=True)
-		
-		
+		oversample = False
+		if oversample:
+			filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
+			filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
+			dups = self.metadata[filt_large_angle & train_filt]
+			self.metadata = pd.concat([self.metadata, dups], axis='rows', ignore_index=True)
+
+
 		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant		
 		self.metadata.loc[:, 'flip'] = False
 		self.metadata.loc[:, 'shear'] = False
@@ -187,9 +188,11 @@ class Process(object, metaclass=Singleton):
 
 		flip_md = self.metadata[filt]
 		flip_md.loc[:, 'flip'] = True
+		flip_md = flip_md.sample(frac=0.25)
 
 		shear_md = self.metadata[filt]
 		shear_md.loc[:, 'shear'] = True
+		shear_md = shear_md.sample(frac=0.2)
 
 		self.metadata = pd.concat([self.metadata, flip_md, shear_md], axis='rows', ignore_index=True)
 
@@ -283,7 +286,7 @@ class Process(object, metaclass=Singleton):
 
 		axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
 		axes[0][1].set_title('cropped')
-		
+
 		if velocity is not None:
 			sheared, shear_angle = self.shear(image, velocity[2], self.max_train_angle)
 			axes[1][0].imshow(sheared, cmap='gray')
@@ -340,10 +343,11 @@ class Process(object, metaclass=Singleton):
 		#if row['augment'] == 'flip':
 
 		# (1) identity
-		yield image, metadata['steering']
+		if not metadata[['flip', 'shear']].any():
+			yield image, metadata['steering']
 
 		# (2) flip
-		if metadata['flip']:
+		elif metadata['flip']:
 			yield self.flip(image, metadata['steering'])
 
 			# # or .. flipped = cv2.flip(image, 1)
@@ -351,30 +355,44 @@ class Process(object, metaclass=Singleton):
 			# steering = - metadata['steering']
 			# yield flipped, steering
 
-		if metadata['shear']:
+		elif metadata['shear']:
 			yield self.shear(image, metadata['steering'], self.max_train_angle)
 
+		else:
+			raise Exception("how did you get here?")
 		# TODO: rotate ..
 		# TODO: exagerate opposite angle and camera
 
 	@staticmethod
 	def open(image_file, preprocess_flag=True):
-		img = np.asarray(Image.open(image_file))
-		if not preprocess_flag:
-			return img
-		return preprocess(img)
+
+		try:
+			with Image.open(image_file) as fd:
+				img = np.asarray(fd)# Image.open(image_file)
+		except:
+			temp_file = os.path.join("temp", os.path.split(image_file)[-1])
+			copyfile(image_file, temp_file)
+
+			with Image.open(temp_file) as fd:
+				img = np.asarray(fd)# Image.open(image_file)
+			os.remove(temp_file)
+		return img
+		#if not preprocess_flag:
+		#	return img
+		#return preprocess(img)
 		#img = cv2.GaussianBlur(img, (3,3), 0)
 		# return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
-		
+
 	@staticmethod
 	def flip(image, steering_angle):
 		return cv2.flip(image, 1), -steering_angle   # cv2.flip(image, 1) or np.fliplr(image)
 
 	@staticmethod
 	def shear(image, steering_angle, max_angle):
-		angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
+		#angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
 		abs_angle = abs(steering_angle)
-		a = np.random.uniform(abs_angle, max_angle)
+		a = np.random.uniform(abs_angle, 2*abs_angle)
+		a = min(a, max_angle)
 		steering_angle_out = a * np.sign(steering_angle)
 
 		rows, cols = image.shape[:2]
@@ -388,28 +406,11 @@ class Process(object, metaclass=Singleton):
 
 		return image, steering_angle_out
 
-
-
-		
-
-
-		# rows,cols,ch = image.shape
-		# dx = np.random.randint(-shear_range,shear_range+1)
-		# #    print('dx',dx)
-		# random_point = [cols/2+dx,rows/2]
-		# pts1 = np.float32([[0,rows],[cols,rows],[cols/2,rows/2]])
-		# pts2 = np.float32([[0,rows],[cols,rows],random_point])
-		# dsteering = dx/(rows/2) * 360/(2*np.pi*25.0) / 6.0    
-		# M = cv2.getAffineTransform(pts1,pts2)
-		# image = cv2.warpAffine(image,M,(cols,rows),borderMode=1)
-		# steering +=dsteering
-    
-
-	def get_indices(self, train_type, index, batch_size):
+	def get_submetadata(self, train_type, index, batch_size):
 		""" """
 		filt = (self.metadata['train_type'] == train_type)
-		indices = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size].index
-		return indices
+		submetadata = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size]
+		return submetadata
 
 	def get(self, train_type):
 		""" """
@@ -436,6 +437,7 @@ class Process(object, metaclass=Singleton):
 				X = np.empty((batch_size, *img.shape))
 				y = np.empty((batch_size), dtype=int)
 
+			# augment must yield a single image. 
 			for _x, _y in self.augment(img, row):
 				X[i,] = _x
 				y[i] = _y
@@ -507,13 +509,32 @@ class DataGenerator(keras.utils.Sequence):
 		return int(np.floor(Process().total_samples(self.train_type) / self.batch_size))
 
 	def __getitem__(self, index):
-		indices = Process().get_indices(self.train_type, index, self.batch_size)
+		metadata = Process().get_submetadata(self.train_type, index, self.batch_size)
 
 		# Generate data
-		X, y = Process().data_generation(indices, self.batch_size)
+		#X, y = Process().data_generation(indices, self.batch_size)
 		#data_generation(self, indices, batch_size, height, width, nchannels):
 
+		X = None
+		y = None
+		# Generate data
+		for j, (i, row) in enumerate(metadata.iterrows()):
+
+			#img = np.asarray(Image.open(row['image']))
+			#img = self.open(row['image'])
+			with Image.open(row['image']) as fd:
+				img = np.asarray(fd)# Image.open(image_file)
+			if X is None or y is None:
+				X = np.empty((self.batch_size, *img.shape))
+				y = np.empty((self.batch_size), dtype=int)
+
+			# augment must yield a single image. 
+			for _x, _y in Process().augment(img, row):
+				X[j,] = _x
+				y[j] = _y
+
 		return X, y
+
 
 	def on_epoch_end(self):
 		'Updates indexes after each epoch'

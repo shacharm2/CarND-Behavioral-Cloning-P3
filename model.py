@@ -7,7 +7,7 @@ import os
 import sys
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation
+from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU
 from keras.regularizers import l2
 
 import matplotlib
@@ -55,16 +55,16 @@ def nvidia_model(in_shape):
 
 	model.add(Flatten())
 	#model.add(Dense(1164, activation='relu', W_regularizer=l2(1e-3)))
-	model.add(Dense(100, activation='relu', W_regularizer=l2(1e-3)))
-	model.add(Dense(50, activation='relu', W_regularizer=l2(1e-3)))
-	model.add(Dense(10, activation='relu', W_regularizer=l2(1e-3)))
+	model.add(Dense(100, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(50, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(10, activation='relu', kernel_regularizer=l2(1e-3)))
 	model.add(Dense(1))
 
 	print(model.summary())
 
 	model.compile(loss="mse", optimizer="adam")
 	params = {}
-	params["EPOCHS"] = 10
+	params["EPOCHS"] = 30
 	params["BATCH_SIZE"] = 64
 
 	return model, params
@@ -78,17 +78,33 @@ def test_model(in_shape, show=False):
 
 	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
-	model.add(Conv2D(3, (3, 3), activation='relu'))
-	model.add(Conv2D(24, (3, 3), activation='relu'))
+
+	# colorspace transform
+	model.add(Conv2D(3, (1, 1), activation='relu'))
+
+	model.add(Conv2D(8, (3, 3)))
+	model.add(BatchNormalization())
+	model.add(Activation(activation='elu'))
+
+	model.add(Conv2D(24, (3, 3)))
+	model.add(BatchNormalization())
+	model.add(Activation(activation='elu'))
+
+	model.add(Conv2D(36, (3, 3)))
+	model.add(BatchNormalization())
+	model.add(Activation(activation='elu'))
+
 	model.add(Flatten())
-	model.add(Dense(32))
+	model.add(Dense(64, activation='elu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(32, activation='elu', kernel_regularizer=l2(1e-3)))
+
 	model.add(Dense(1))
 
 	model.compile(loss="mse", optimizer="adam")
 
 	params = {}
-	params["EPOCHS"] = 3
-	params["BATCH_SIZE"] = 64
+	params["EPOCHS"] = 10
+	params["BATCH_SIZE"] = 32
 	return model, params
 
 def generate_model(model_name, in_shape):
@@ -142,5 +158,4 @@ if __name__ == "__main__":
 	if not os.path.exists("model.h5"):
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 
-	
 

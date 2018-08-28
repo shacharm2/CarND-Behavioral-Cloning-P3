@@ -61,11 +61,11 @@ def telemetry(sid, data):
 		imgString = data["image"]
 		image = Image.open(BytesIO(base64.b64decode(imgString)))
 		image_array = np.asarray(image)
-		
+
 		## nvidia preprocess
 		# image = cv2.GaussianBlur(image, (3,3), 0)
 		# image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
-		image_array = data_server.preprocess(image_array)
+		#image_array = data_server.preprocess(image_array)
 		## nvidia preprocess
 
 		steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
