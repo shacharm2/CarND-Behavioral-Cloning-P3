@@ -7,7 +7,7 @@ import os
 import sys
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU
+from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU, Dropout, MaxPooling2D
 from keras.regularizers import l2
 
 import matplotlib
@@ -64,7 +64,7 @@ def nvidia_model(in_shape):
 
 	model.compile(loss="mse", optimizer="adam")
 	params = {}
-	params["EPOCHS"] = 30
+	params["EPOCHS"] = 10
 	params["BATCH_SIZE"] = 64
 
 	return model, params
@@ -76,35 +76,31 @@ def test_model(in_shape, show=False):
 	#input_img = Input(shape=in_shape)
 	model = Sequential()
 
-	model.add(Cropping2D(cropping=((50, 25), (0,0)), input_shape=in_shape))
+	model.add(Cropping2D(cropping=((70, 25), (0,0)), input_shape=in_shape))
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
 
 	# colorspace transform
-	model.add(Conv2D(3, (1, 1), activation='relu'))
+	model.add(Conv2D(16, (1, 1), activation='relu'))
 
-	model.add(Conv2D(8, (3, 3)))
-	model.add(BatchNormalization())
-	model.add(Activation(activation='elu'))
-
-	model.add(Conv2D(24, (3, 3)))
-	model.add(BatchNormalization())
-	model.add(Activation(activation='elu'))
-
-	model.add(Conv2D(36, (3, 3)))
-	model.add(BatchNormalization())
-	model.add(Activation(activation='elu'))
+	for i in range(3):
+		model.add(Conv2D(8, (3, 3), activation='relu'))
+		model.add(Conv2D(8, (3, 3), activation='relu'))
+		model.add(MaxPooling2D(pool_size=(2, 2)))
+		model.add(Dropout(0.5))
 
 	model.add(Flatten())
-	model.add(Dense(64, activation='elu', kernel_regularizer=l2(1e-3)))
-	model.add(Dense(32, activation='elu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(128, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(64, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3)))
 
 	model.add(Dense(1))
 
 	model.compile(loss="mse", optimizer="adam")
 
 	params = {}
-	params["EPOCHS"] = 10
-	params["BATCH_SIZE"] = 32
+	params["EPOCHS"] = 15
+	params["BATCH_SIZE"] = 128
+
 	return model, params
 
 def generate_model(model_name, in_shape):

@@ -188,13 +188,14 @@ class Process(object, metaclass=Singleton):
 
 		flip_md = self.metadata[filt]
 		flip_md.loc[:, 'flip'] = True
-		flip_md = flip_md.sample(frac=0.25)
+		flip_md = flip_md.sample(frac=1)
 
 		shear_md = self.metadata[filt]
 		shear_md.loc[:, 'shear'] = True
-		shear_md = shear_md.sample(frac=0.2)
+		shear_md = shear_md.sample(frac=0)
 
 		self.metadata = pd.concat([self.metadata, flip_md, shear_md], axis='rows', ignore_index=True)
+		#self.metadata = pd.concat([self.metadata, flip_md], axis='rows', ignore_index=True)
 
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), color='r', alpha=0.5, ax=axes[0], label='preprocessing')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], color='r', alpha=0.5, label='preprocessing')
@@ -203,7 +204,6 @@ class Process(object, metaclass=Singleton):
 		plt.savefig("output_images/1_steering_histogram.png".format(sub_folder))
 
 		plt.close(fig)
-		self.metadata[self.metadata['shear']].iloc[0]
 
 		# if shuffle:
 		# 	self.shuffle() # = self.metadata.sample(frac=1)
@@ -217,11 +217,11 @@ class Process(object, metaclass=Singleton):
 		# self.metadata.loc[test_idx, 'train_type'] = 'test'
 
 		# save 
-		for _ in range(2):
+		for _ in range(20):
 			random_image = np.random.randint(len(self.metadata))
 
-			al = self.metadata.loc[random_image, 'steering']
-			full_image_name = self.metadata.loc[random_image, 'image']
+			al = self.metadata.iloc[random_image]['steering']
+			full_image_name = self.metadata.iloc[random_image]['image']
 			image_name = os.path.splitext(os.path.split(full_image_name)[-1])[0]
 			#image = np.asarray(Image.open(full_image_name))
 			image = self.open(full_image_name, preprocess_flag=False)
@@ -233,7 +233,7 @@ class Process(object, metaclass=Singleton):
 
 			self.imshow_augmentations(image, image_name=image_name, velocity=(p0, p1, al), save=True)
 		else:
-			image = self.open(self.metadata.loc[0, 'image'])
+			image = self.open(self.metadata.iloc[0]['image'])
 
 	def split(self, shuffle=True, train_size=0.7):
 		""" train/valid/test split """
@@ -366,16 +366,8 @@ class Process(object, metaclass=Singleton):
 	@staticmethod
 	def open(image_file, preprocess_flag=True):
 
-		try:
-			with Image.open(image_file) as fd:
-				img = np.asarray(fd)# Image.open(image_file)
-		except:
-			temp_file = os.path.join("temp", os.path.split(image_file)[-1])
-			copyfile(image_file, temp_file)
-
-			with Image.open(temp_file) as fd:
-				img = np.asarray(fd)# Image.open(image_file)
-			os.remove(temp_file)
+		with Image.open(image_file) as fd:
+			img = np.asarray(fd)# Image.open(image_file)
 		return img
 		#if not preprocess_flag:
 		#	return img
