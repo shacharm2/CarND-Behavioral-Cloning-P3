@@ -339,14 +339,14 @@ class Process(object, metaclass=Singleton):
 
 		# (1) identity
 		if metadata[['identity']].any():
-			yield image, metadata['steering']
+			return image, metadata['steering']
 
 		# (2) flip
 		elif metadata['flip']:
-			yield self.flip(image, metadata['steering'])
+			return self.flip(image, metadata['steering'])
 
 		elif metadata['shear']:
-			yield self.shear(image, metadata['steering'], self.max_train_angle)
+			return self.shear(image, metadata['steering'], self.max_train_angle)
 
 		else:
 			raise Exception("how did you get here?")
@@ -390,7 +390,7 @@ class Process(object, metaclass=Singleton):
 
 	def get_submetadata(self, train_type, index, batch_size):
 		""" """
-		filt = (self.metadata['train_type'] == train_type)
+		filt = self.metadata['train_type'].eq(train_type)
 		submetadata = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size]
 		return submetadata
 
@@ -508,15 +508,15 @@ class DataGenerator(keras.utils.Sequence):
 				img = np.asarray(fd)# Image.open(image_file)
 			if X is None or y is None:
 				X = np.empty((self.batch_size, *img.shape))
-				y = np.empty((self.batch_size), dtype=int)
+				y = np.empty((self.batch_size), dtype=float)
 
 			# augment must yield a single image. 
-			for _x, _y in Process().augment(img, row):
-				X[j,] = _x
-				y[j] = _y
+			# for _x, _y in Process().augment(img, row):
+			# 	X[j,] = _x
+			# 	y[j] = _y
+			X[j,], y[j] = Process().augment(img, row)
 
 		return X, y
-
 
 	def on_epoch_end(self):
 		'Updates indexes after each epoch'
