@@ -75,17 +75,26 @@ def nvidia_model(in_shape):
 def test_model(in_shape, show=False):
 	model = Sequential()
 	model.add(Lambda(lambda x: x/255 - 1.0, input_shape=in_shape))
-	model.add(Cropping2D(cropping=((30, 25), (0,0)), input_shape=in_shape))
-	model.add(Conv2D(24, 5, 5, activation='elu', subsample=(2, 2)))
-	model.add(Conv2D(36, 5, 5, activation='elu', subsample=(2, 2)))
-	model.add(Conv2D(48, 5, 5, activation='elu', subsample=(2, 2)))
-	#model.add(Conv2D(64, 3, 3, activation='elu'))
-	model.add(Conv2D(64, 3, 3, activation='elu'))
-	model.add(Dropout(0.5))
-	model.add(Flatten())
-	model.add(Dense(50, activation='elu', kernel_regularizer=l2(1e-4)))
-	model.add(Dense(10, activation='elu', kernel_regularizer=l2(1e-4)))
+	model.add(Cropping2D(cropping=(data_server.PARAMS['crop'], (0,0)), input_shape=in_shape))
 
+	model.add(Conv2D(3, (1, 1), activation='relu'))
+
+	for i in range(2):
+		model.add(Conv2D(8, (3, 3)))
+		model.add(BatchNormalization())
+		model.add(Activation(activation='relu'))
+
+		model.add(Conv2D(8, (3, 3)))
+		model.add(BatchNormalization())
+		model.add(Activation(activation='relu'))
+
+		model.add(MaxPooling2D(pool_size=(2,2)))
+
+
+	model.add(Flatten())
+	model.add(Dense(64, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(16, activation='relu', kernel_regularizer=l2(1e-3)))
 	model.add(Dense(1))
 	print(model.summary())
 
@@ -94,12 +103,9 @@ def test_model(in_shape, show=False):
 
 	params = {}
 	params["EPOCHS"] = 10
-	params["BATCH_SIZE"] = 64
+	params["BATCH_SIZE"] = 128
 
 	return model, params
-
-
-
 
 
 def test_model_0(in_shape, show=False):
@@ -173,7 +179,8 @@ if __name__ == "__main__":
 			verbose=1,
 			validation_data=valid_generator,
 			validation_steps=validation_steps,
-			epochs=EPOCHS)
+			epochs=EPOCHS,
+			workers=10)
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
