@@ -185,8 +185,8 @@ class Process(object, metaclass=Singleton):
 		#filt = train_filt & (self.metadata['steering'].abs() < 0.01)
 		#filt = train_filt & self.metadata['steering'].abs().lt(0.01)
 		filt = self.metadata['steering'].abs().gt(0.01)
-		# filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-		# filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+		filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
+		filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
 
 		flip_md = self.metadata[filt]
 		flip_md.loc[:, 'identity'] = False
@@ -209,7 +209,7 @@ class Process(object, metaclass=Singleton):
 
 
 		# save 
-		for _ in range(20):
+		for _ in range(10):
 			random_image = np.random.randint(len(self.metadata))
 
 			al = self.metadata.iloc[random_image]['steering']
@@ -338,7 +338,7 @@ class Process(object, metaclass=Singleton):
 		#if row['augment'] == 'flip':
 
 		# (1) identity
-		if metadata[['identity']].any():
+		if metadata['identity']:
 			yield image, metadata['steering']
 
 		# (2) flip
@@ -358,7 +358,7 @@ class Process(object, metaclass=Singleton):
 
 		with Image.open(image_file) as fd:
 			img = np.asarray(fd)# Image.open(image_file)
-		#return img
+		return img
 		#if not preprocess_flag:
 		#	return img
 		#return preprocess(img)
@@ -373,8 +373,8 @@ class Process(object, metaclass=Singleton):
 	def shear(image, steering_angle, max_angle):
 		#angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
 		abs_angle = abs(steering_angle)
-		a = np.random.uniform(abs_angle, 2*abs_angle)
-		a = min(a, max_angle)
+		a = np.random.uniform(abs_angle, max_angle)
+		#a = min(a, max_angle)
 		steering_angle_out = a * np.sign(steering_angle)
 
 		rows, cols = image.shape[:2]
