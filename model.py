@@ -8,6 +8,8 @@ import sys
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU, Dropout, MaxPooling2D
+from keras.optimizers import Adam
+
 from keras.regularizers import l2
 
 import matplotlib
@@ -69,8 +71,36 @@ def nvidia_model(in_shape):
 
 	return model, params
 
-
 def test_model(in_shape, show=False):
+	model = Sequential()
+	model.add(Lambda(lambda x: x/127.5-1.0, input_shape=in_shape))
+	model.add(Conv2D(24, 5, 5, activation='elu', subsample=(2, 2)))
+	model.add(Conv2D(36, 5, 5, activation='elu', subsample=(2, 2)))
+	model.add(Conv2D(48, 5, 5, activation='elu', subsample=(2, 2)))
+	model.add(Conv2D(64, 3, 3, activation='elu'))
+	model.add(Conv2D(64, 3, 3, activation='elu'))
+	model.add(Dropout(0.5))
+	model.add(Flatten())
+	model.add(Dense(100, activation='elu'))
+	model.add(Dense(50, activation='elu'))
+	model.add(Dense(10, activation='elu'))
+	model.add(Dense(1))
+	print(model.summary())
+
+
+	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-4))
+
+	params = {}
+	params["EPOCHS"] = 5
+	params["BATCH_SIZE"] = 64
+
+	return model, params
+
+
+
+
+
+def test_model_0(in_shape, show=False):
 	#model = Sequential()
 	# https://stackoverflow.com/questions/41925765/keras-cropping2d-changes-color-channel
 	#input_img = Input(shape=in_shape)
@@ -80,11 +110,11 @@ def test_model(in_shape, show=False):
 	model.add(Lambda(lambda x: x / 255.0 - 0.5))
 
 	# colorspace transform
-	model.add(Conv2D(16, (1, 1), activation='relu'))
+	model.add(Conv2D(8, (1, 1), activation='relu'))
 
 	for i in range(3):
-		model.add(Conv2D(8, (3, 3), activation='relu'))
-		model.add(Conv2D(8, (3, 3), activation='relu'))
+		model.add(Conv2D(32, (3, 3), activation='relu'))
+		model.add(Conv2D(32, (3, 3), activation='relu'))
 		model.add(MaxPooling2D(pool_size=(2, 2)))
 		model.add(Dropout(0.5))
 
@@ -98,8 +128,8 @@ def test_model(in_shape, show=False):
 	model.compile(loss="mse", optimizer="adam")
 
 	params = {}
-	params["EPOCHS"] = 15
-	params["BATCH_SIZE"] = 128
+	params["EPOCHS"] = 10
+	params["BATCH_SIZE"] = 256
 
 	return model, params
 
@@ -141,17 +171,18 @@ if __name__ == "__main__":
 			verbose=1,
 			validation_data=valid_generator,
 			validation_steps=validation_steps,
-			epochs=EPOCHS)
-			#		max_queue_size=10,
-			#		workers=3,
-			#		use_multiprocessing=True)
+			epochs=EPOCHS,
+			max_queue_size=10,
+			workers=5,
+			use_multiprocessing=True)
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
 
 
-	model.load_weights('model_weights.h5', by_name=True)
 	if not os.path.exists("model.h5"):
+		model.load_weights('model_weights.h5', by_name=True)
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 
-
+	#data_server.Process().load_metadata()
+	#metadata = data_server.Process().metadata	

@@ -63,16 +63,19 @@ class Process(object, metaclass=Singleton):
 		self.out_folder = "output_images"
 
 		submetadata = []
+		filter_folders = ["data"]
 		for sub_folder in os.listdir(self.data_folder):
 			curr_dir = os.path.join(self.data_folder, sub_folder)
-			if not os.path.isdir(curr_dir):
+			csv_metadata = os.path.join(curr_dir, 'driving_log.csv')
+			if not os.path.isdir(curr_dir) or not os.path.exists(csv_metadata):
+				continue
+			elif filter_folders and not sub_folder in filter_folders:
 				continue
 
 			self.folders.append(curr_dir)
-			csv_metadata = os.path.join(curr_dir, 'driving_log.csv')
+
 
 			fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(20,20))
-
 			metadata_i = pd.read_csv(csv_metadata)
 
 			# metadata_i['flip'] = False
@@ -87,7 +90,7 @@ class Process(object, metaclass=Singleton):
 				steering_angle.plot(linewidth=2, color='b', ax=axes[ndir], label='raw', alpha=0.5)
 				axes[ndir].fill_between(steering_angle.index, 0, steering_angle, color='b', alpha=0.5)
 
-				steering_angle = steering_angle.rolling(5, center=True).mean().fillna(method='ffill').fillna(method='bfill')
+				steering_angle = steering_angle.rolling(3, center=True).mean().fillna(method='ffill').fillna(method='bfill')
 
 				steering_angle.plot(linewidth=2, color='tab:olive', ax=axes[ndir], label='interp', alpha=0.8)
 				axes[ndir].set_title(direction)
@@ -99,7 +102,8 @@ class Process(object, metaclass=Singleton):
 			else:
 				plt.savefig("output_images/1_steerings_{}.png".format(sub_folder))
 				# plt.show()
-		plt.close(fig)
+				plt.close(fig)
+
 		self.metadata = pd.concat(submetadata, ignore_index=True, sort=False)
 
 		fig, axes = plt.subplots(nrows=1, ncols=len(to_save), figsize=(20,20))
@@ -125,7 +129,7 @@ class Process(object, metaclass=Singleton):
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
 		self.max_train_angle = self.metadata['steering'].abs().max()
 
-		frac = 0.1
+		frac = 0.025
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
@@ -154,15 +158,6 @@ class Process(object, metaclass=Singleton):
 		self.metadata = pd.concat([zero_df, nonzero_df], axis='rows')
 
 		self.split(shuffle, train_size)
-		# if shuffle:
-		# 	self.shuffle() # = self.metadata.sample(frac=1)
-		# self.metadata.loc[: ,'type'] = None
-		# train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
-		# val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
-
-		# self.metadata.loc[train_idx, 'train_type'] = 'train'
-		# self.metadata.loc[val_idx, 'train_type'] = 'valid'
-		# self.metadata.loc[test_idx, 'train_type'] = 'test'
 
 		#train_filt = (self.metadata.loc[train_idx, 'train_type'] == 'train')
 		train_filt = self.metadata['train_type'].eq('train')
@@ -170,33 +165,38 @@ class Process(object, metaclass=Singleton):
 		## augmentations ##
 		# oversample > 25 deg
 		#(self.metadata['steering'] > 24.5 * np.pi / 180)
-		oversample = False
+		oversample = True
 		if oversample:
 			filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
 			filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
-			dups = self.metadata[filt_large_angle & train_filt]
+			dups = self.metadata[filt_large_angle]# & train_filt]
 			self.metadata = pd.concat([self.metadata, dups], axis='rows', ignore_index=True)
 
 
 		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant		
+		self.metadata.loc[:, 'identity'] = True
 		self.metadata.loc[:, 'flip'] = False
 		self.metadata.loc[:, 'shear'] = False
+
+
 		#filt = train_filt & (self.metadata['steering'].abs() < 0.01)
-		filt = train_filt & self.metadata['steering'].abs().lt(0.01)
+		#filt = train_filt & self.metadata['steering'].abs().lt(0.01)
+		filt = self.metadata['steering'].abs().gt(0.01)
 		# filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
 		# filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
 
 		flip_md = self.metadata[filt]
+		flip_md.loc[:, 'identity'] = False
 		flip_md.loc[:, 'flip'] = True
 		flip_md = flip_md.sample(frac=1)
 
 		shear_md = self.metadata[filt]
+		shear_md.loc[:, 'identity'] = False
 		shear_md.loc[:, 'shear'] = True
 		shear_md = shear_md.sample(frac=0)
 
 		self.metadata = pd.concat([self.metadata, flip_md, shear_md], axis='rows', ignore_index=True)
-		#self.metadata = pd.concat([self.metadata, flip_md], axis='rows', ignore_index=True)
-
+		self.shuffle()
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), color='r', alpha=0.5, ax=axes[0], label='preprocessing')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], color='r', alpha=0.5, label='preprocessing')
 		axes[0].legend()
@@ -205,16 +205,6 @@ class Process(object, metaclass=Singleton):
 
 		plt.close(fig)
 
-		# if shuffle:
-		# 	self.shuffle() # = self.metadata.sample(frac=1)
-
-		# self.metadata.loc[: ,'type'] = None
-		# train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
-		# val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
-
-		# self.metadata.loc[train_idx, 'train_type'] = 'train'
-		# self.metadata.loc[val_idx, 'train_type'] = 'valid'
-		# self.metadata.loc[test_idx, 'train_type'] = 'test'
 
 		# save 
 		for _ in range(20):
@@ -242,7 +232,7 @@ class Process(object, metaclass=Singleton):
 
 		self.metadata.loc[: ,'type'] = None
 		train_idx, test_val_idx = train_test_split(self.metadata.index, train_size=train_size)
-		val_idx, test_idx = train_test_split(test_val_idx, train_size=0.5)
+		val_idx, test_idx = train_test_split(test_val_idx, train_size=0.9)
 
 		self.metadata.loc[train_idx, 'train_type'] = 'train'
 		self.metadata.loc[val_idx, 'train_type'] = 'valid'
@@ -251,6 +241,9 @@ class Process(object, metaclass=Singleton):
 
 	def dump_metadata(self):
 		self.metadata.to_hdf("metadata.hdf", key="metadata")
+
+	def load_metadata(self):
+		self.metadata = pd.read_hdf("metadata.hdf", key="metadata")
 
 	def imshow_augmentations(self, image, image_name=None, velocity=None, save=False, show=False):
 		fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20,20))
@@ -343,17 +336,12 @@ class Process(object, metaclass=Singleton):
 		#if row['augment'] == 'flip':
 
 		# (1) identity
-		if not metadata[['flip', 'shear']].any():
+		if metadata[['identity']].any():
 			yield image, metadata['steering']
 
 		# (2) flip
 		elif metadata['flip']:
 			yield self.flip(image, metadata['steering'])
-
-			# # or .. flipped = cv2.flip(image, 1)
-			# flipped = np.fliplr(image)
-			# steering = - metadata['steering']
-			# yield flipped, steering
 
 		elif metadata['shear']:
 			yield self.shear(image, metadata['steering'], self.max_train_angle)
@@ -368,12 +356,12 @@ class Process(object, metaclass=Singleton):
 
 		with Image.open(image_file) as fd:
 			img = np.asarray(fd)# Image.open(image_file)
-		return img
+		#return img
 		#if not preprocess_flag:
 		#	return img
 		#return preprocess(img)
-		#img = cv2.GaussianBlur(img, (3,3), 0)
-		# return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
+		img = cv2.GaussianBlur(img, (3,3), 0)
+		return cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
 
 	@staticmethod
 	def flip(image, steering_angle):
@@ -391,8 +379,8 @@ class Process(object, metaclass=Singleton):
 		# around middle point
 		dx = 0.5 * rows * np.tan(steering_angle_out)
 		shifted = [0.5 * cols + dx, 0.5 * rows]
-		pt_in = np.float32([[0, rows],[cols,rows], [cols / 2, rows / 2]])
-		pt_out = np.float32([[0, rows],[cols,rows], shifted])
+		pt_in = np.float32([[0, rows],[cols, rows], [cols / 2, rows / 2]])
+		pt_out = np.float32([[0, rows],[cols, rows], shifted])
 		M = cv2.getAffineTransform(pt_in, pt_out)
 		image = cv2.warpAffine(image, M, (cols, rows), borderMode=cv2.BORDER_REPLICATE)
 
