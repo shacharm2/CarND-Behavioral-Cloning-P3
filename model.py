@@ -9,6 +9,7 @@ import sys
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU, Dropout, MaxPooling2D
 from keras.optimizers import Adam
+from keras import metrics
 
 from keras.regularizers import l2
 
@@ -81,17 +82,18 @@ def test_model(in_shape, show=False):
 	model.add(Conv2D(64, 3, 3, activation='elu'))
 	model.add(Dropout(0.5))
 	model.add(Flatten())
-	model.add(Dense(100, activation='elu'))
-	model.add(Dense(50, activation='elu'))
-	model.add(Dense(10, activation='elu'))
+	model.add(Dense(100, activation='elu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(50, activation='elu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(10, activation='elu', kernel_regularizer=l2(1e-3)))
+
 	model.add(Dense(1))
 	print(model.summary())
 
 
-	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-4))
+	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-4), metrics=[metrics.mean_squared_error])
 
 	params = {}
-	params["EPOCHS"] = 5
+	params["EPOCHS"] = 10
 	params["BATCH_SIZE"] = 64
 
 	return model, params
@@ -171,10 +173,7 @@ if __name__ == "__main__":
 			verbose=1,
 			validation_data=valid_generator,
 			validation_steps=validation_steps,
-			epochs=EPOCHS,
-			max_queue_size=10,
-			workers=5,
-			use_multiprocessing=True)
+			epochs=EPOCHS)
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')

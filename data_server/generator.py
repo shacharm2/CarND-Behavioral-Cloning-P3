@@ -24,11 +24,14 @@ import matplotlib
 if not "DISPLAY" in os.environ:
 	matplotlib.use('Agg')
 from matplotlib import pyplot as plt
-from shutil  import copyfile
+from shutil import copyfile
+from time import time
+
 import ipdb
 
 print(matplotlib.get_backend())
-np.random.seed(42)
+
+np.random.seed(int(time()))
 
 class Singleton(type):
 	""" https://stackoverflow.com/questions/6760685/creating-a-singleton-in-python
@@ -129,11 +132,11 @@ class Process(object, metaclass=Singleton):
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], label='raw')
 		self.max_train_angle = self.metadata['steering'].abs().max()
 
-		frac = 0.025
+		frac = 0.1
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
-		elif True:
+		elif False:
 			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
 			filt = (self.metadata['steering'].abs() < 0.01)
 
@@ -165,7 +168,7 @@ class Process(object, metaclass=Singleton):
 		## augmentations ##
 		# oversample > 25 deg
 		#(self.metadata['steering'] > 24.5 * np.pi / 180)
-		oversample = True
+		oversample = False#True
 		if oversample:
 			filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
 			filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
@@ -193,10 +196,9 @@ class Process(object, metaclass=Singleton):
 		shear_md = self.metadata[filt]
 		shear_md.loc[:, 'identity'] = False
 		shear_md.loc[:, 'shear'] = True
-		shear_md = shear_md.sample(frac=0)
+		shear_md = shear_md.sample(frac=1)
 
 		self.metadata = pd.concat([self.metadata, flip_md, shear_md], axis='rows', ignore_index=True)
-		self.shuffle()
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), color='r', alpha=0.5, ax=axes[0], label='preprocessing')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], color='r', alpha=0.5, label='preprocessing')
 		axes[0].legend()
