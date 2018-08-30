@@ -297,13 +297,13 @@ class Process(object, metaclass=Singleton):
 		self.metadata = pd.read_hdf("metadata.hdf", key="metadata")
 
 	def imshow_augmentations(self, image, image_name=None, velocity=None, save=False, show=False):
-		fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20,20))
+		fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(20,20))
 		model = Sequential()
 		model.add(Cropping2D(cropping=(PARAMS['crop'], (0,0)), input_shape=image.shape))
 
 		cropped_output = keras.backend.function([model.layers[0].input], [model.layers[0].output])
 		new_image = cropped_output([image[None,...]])[0]
-		for iimg in [0, 2]:
+		for iimg in [0, 2, 3]:
 			axes[iimg][0].imshow(image / 255, cmap='gray')
 			axes[iimg][0].set_title('raw')
 
@@ -314,9 +314,15 @@ class Process(object, metaclass=Singleton):
 			p0, p1, al = velocity
 			X = np.array([p1[0], p0[0]])
 			Y = np.array([p1[1], p0[1]])
-			for iimg in [0, 2]:
+			for iimg in [0, 2, 3]:
 				axes[iimg][0].plot(X, Y, linewidth=10)
 				axes[iimg][0].set_title("steering {0:2.1f}".format(al * 180 / np.pi))
+
+			# show half image obscure
+			half_image, steering = self.mask_half(image, velocity[2])
+			axes[3][1].imshow(half_image / 255, cmap='gray')
+			axes[3][1].plot(X, Y, linewidth=10)
+			axes[3][1].set_title("Occlusion, steering {0:2.1f}".format(steering * 180 / np.pi))
 
 			# flip
 			flipped, flip_al = self.flip(image, al)
@@ -331,9 +337,7 @@ class Process(object, metaclass=Singleton):
 			axes[2][1].plot(X, Y, linewidth=10)
 			axes[2][1].set_title("steering {0:2.1f}".format(flip_al * 180 / np.pi))
 
-
-			# show half image obscure
-			half_image, steering = self.(image, velocity[2])
+			
 
 		#axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
 		#axes[0][1].set_title('cropped')
@@ -460,7 +464,7 @@ class Process(object, metaclass=Singleton):
 	@staticmethod
 	def mask_half(image, steering_angle):
 		img = image.copy()
-		rows, cols = img.shape[1]
+		rows, cols = img.shape[:2]
 
 		if steering_angle > 0:
 			contours = np.array([[0, 0], [0, rows], [cols/2, rows], [cols/2 + rows * np.tan(steering_angle), 0]], np.int32)
