@@ -88,6 +88,7 @@ def preprocess(image):
 
 class Process(object, metaclass=Singleton):
 
+	side_camera_bias = .22
 	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.8):
 		self.data_folder = data_folder
 		self.folders = []
@@ -113,8 +114,7 @@ class Process(object, metaclass=Singleton):
 			# metadata_i['flip'] = False
 			# metadata_i.loc[metadata_i['steering'].abs() < 0.01, 'flip'] = True
 			to_save = []
-			side_camera_bias = .25
-			alpha = {'left': side_camera_bias, 'center': 0, 'right': -side_camera_bias}
+			alpha = {'left': self.side_camera_bias, 'center': 0, 'right': -self.side_camera_bias}
 			for ndir, direction in enumerate(sorted(alpha)):  #['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
 				steering_angle = (metadata_i['steering'] + alpha[direction])
@@ -173,16 +173,17 @@ class Process(object, metaclass=Singleton):
 		# how to choose the fraction
 		# max(np.histogram(self.metadata.loc[~filt, "steering"], bins=int(np.sqrt(len(self.metadata))))[0])
 		frac = 0.1
+		width = 0.05
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
 		elif True:
 			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
-			filt = (self.metadata['steering'].abs() < 0.01)
+			filt = (self.metadata['steering'].abs() < width)
 
 			# perhaps these shouldn't be removed
-			filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-			filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+			filt |= ((self.metadata['steering'] - self.side_camera_bias).abs() < width)
+			filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
@@ -195,7 +196,7 @@ class Process(object, metaclass=Singleton):
 			filt = self.metadata['steering'].abs().eq(0)
 
 			# perhaps these shouldn't be removed
-			filt |= self.metadata['steering'].abs().eq(side_camera_bias)
+			filt |= self.metadata['steering'].abs().eq(self.side_camera_bias)
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
@@ -230,9 +231,9 @@ class Process(object, metaclass=Singleton):
 
 		#filt = train_filt & (self.metadata['steering'].abs() < 0.01)
 		#filt = train_filt & self.metadata['steering'].abs().lt(0.01)
-		filt = self.metadata['steering'].abs().gt(0.01)
-		filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-		filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+		filt = self.metadata['steering'].abs().gt(width)
+		filt |= ((self.metadata['steering'] - self.side_camera_bias).abs() < width)
+		filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
 
 		#translate_md.loc[:, 'identity'] = False
 		#translate_md.loc[:, 'translate'] = True
