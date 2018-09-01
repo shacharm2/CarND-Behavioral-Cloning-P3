@@ -7,7 +7,8 @@ import os
 import sys
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU, Dropout, MaxPooling2D
+from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU, Dropout, MaxPooling2D, merge
+from keras.layers.merge import concatenate
 from keras.optimizers import Adam
 from keras import metrics
 
@@ -108,7 +109,68 @@ def test_model(in_shape, show=False):
 	return model, params
 
 
-def test_model_0(in_shape, show=False):
+class DenseNet(Model):
+	# https://towardsdatascience.com/densenet-2810936aeebb
+	def __init__(self, in_shape, show=False):
+		channels = 16
+		self.stage = 0
+		self.set_params()
+		#uodel = Sequential()
+		inputs = Input(shape=in_shape, name="input")
+		x = Lambda(lambda x: x/255 - 1.0)(inputs)
+		#model.add(Cropping2D(cropping=(data_server.PARAMS['crop'], (0,0)), input_shape=in_shape))
+
+		# dense block
+		for i in range(4):
+			x_block = self.conv_block(x, channels)
+			x = concatenate([x, x_block])
+
+		x = self.bottleneck_block(x, channels)
+
+		# output
+		x = Flatten()(x)
+		x = Dense(64, activation='relu', kernel_regularizer=l2(1e-3), name="FC_stage_{}".format(self.stage))(x)
+		x = Dense(32, activation='relu', kernel_regularizer=l2(1e-3))(x)
+		x = Dense(16, activation='relu', kernel_regularizer=l2(1e-3))(x)
+		x = Dense(1)(x)
+		super().__init__(inputs=inputs, outputs=x)
+
+		print(self.summary())
+		self.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=[metrics.mean_squared_error])
+
+	def set_params(self):
+		self.params = {}
+		self.params["EPOCHS"] = 10
+		self.params["BATCH_SIZE"] = 32
+
+
+	def bottleneck_block(self, x, channels):
+		method = 'bottleneck_block'
+		x = Conv2D(channels, (1, 1), padding='same', name="{}_conv_stage_{}".format(method, self.stage))(x)
+		x = MaxPooling2D((3, 3), strides=(2, 2), name='{}_pool_stage_{}'.format(method,self.stage))(x)
+
+		self.stage += 1
+		return x
+
+	def conv_block(self, x, channels):
+		method = 'conv_block'
+		x = Conv2D(channels, (1, 1), padding='same', name="{}_conv_1x1_stage_{}".format(method, self.stage))(x)
+		x = BatchNormalization(axis=3, name="{}_BN_1x1_stage_{}".format(method, self.stage))(x)
+		x = Activation(activation='relu', name="{}_relu_1x1_stage_{}".format(method, self.stage))(x)
+
+		x = Conv2D(channels, (3, 3), padding='same', name="{}_conv_3x3_stage_{}".format(method, self.stage))(x)
+		x = BatchNormalization(axis=3, name="{}_BN_3x3_stage_{}".format(method, self.stage))(x)
+		x = Activation(activation='relu', name="{}_relu_3x3_stage_{}".format(method, self.stage))(x)
+		self.stage += 1
+
+		return x
+
+
+	#def dense_block(self):
+	#	#https://github.com/flyyufelix/DenseNet-Keras/blob/master/densenet121.py
+
+
+def inception_model(in_shape, show=False):
 	#model = Sequential()
 	# https://stackoverflow.com/questions/41925765/keras-cropping2d-changes-color-channel
 	#input_img = Input(shape=in_shape)
@@ -147,11 +209,14 @@ def generate_model(model_name, in_shape):
 		model, params = test_model(in_shape)
 	elif model_name == "nvidia":
 		model, params = nvidia_model(in_shape)
+	elif model_name.lower() == "densenet":
+		model = DenseNet(in_shape)
+		params = model.params
 	else:
 		raise Exception("select test/nvidia models")
 	return model, params
 
-if __name__ == "__main__":
+def main():
 	model_name = "nvidia"
 	if len(sys.argv) > 1:
 		model_name = sys.argv[-1]
@@ -177,10 +242,11 @@ if __name__ == "__main__":
 		model.fit_generator(
 			generator=train_generator,
 			#steps_per_epoch=samples_per_epoch // BATCH_SIZE,
-			#verbose=1,
+			verbose=1,
 			validation_data=valid_generator,
 			validation_steps=validation_steps,
-			epochs=EPOCHS)
+			epochs=EPOCHS,
+			workers=3)
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
@@ -191,4 +257,10 @@ if __name__ == "__main__":
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 
 	#data_server.Process().load_metadata()
-	#metadata = data_server.Process().metadata	
+	#metadata = data_server.Process().metadata
+
+
+if __name__ == "__main__":
+	DenseNet((160, 32, 3))
+	main()
+
