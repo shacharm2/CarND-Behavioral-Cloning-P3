@@ -88,6 +88,7 @@ def preprocess(image):
 
 class Process(object, metaclass=Singleton):
 
+	side_camera_bias = .22
 	def __init__(self, data_folder='/opt/carnd_p3/', shuffle=True, train_size=0.8):
 		self.data_folder = data_folder
 		self.folders = []
@@ -113,8 +114,7 @@ class Process(object, metaclass=Singleton):
 			# metadata_i['flip'] = False
 			# metadata_i.loc[metadata_i['steering'].abs() < 0.01, 'flip'] = True
 			to_save = []
-			side_camera_bias = .25
-			alpha = {'left': side_camera_bias, 'center': 0, 'right': -side_camera_bias}
+			alpha = {'left': self.side_camera_bias, 'center': 0, 'right': -self.side_camera_bias}
 			for ndir, direction in enumerate(sorted(alpha)):  #['center', 'left', 'right']:
 				abs_paths = metadata_i[direction].apply(lambda subdir: os.path.join(curr_dir, subdir.strip(' ')))
 				steering_angle = (metadata_i['steering'] + alpha[direction])
@@ -142,6 +142,7 @@ class Process(object, metaclass=Singleton):
 		# augment only non zero steering angles - abundant & (angle == -angle ) is redundant		
 		self.metadata.loc[:, 'identity'] = True
 		self.metadata.loc[:, 'flip'] = False
+		self.metadata.loc[:, 'half'] = False
 		self.metadata.loc[:, 'shear'] = False
 		self.metadata.loc[:, 'translate'] = False
 
@@ -172,16 +173,17 @@ class Process(object, metaclass=Singleton):
 		# how to choose the fraction
 		# max(np.histogram(self.metadata.loc[~filt, "steering"], bins=int(np.sqrt(len(self.metadata))))[0])
 		frac = 0.1
+		width = 0.05
 		if False:
 			nonzero_df = self.metadata[self.metadata['steering'] != 0]
 			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
 		elif True:
 			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
-			filt = (self.metadata['steering'].abs() < 0.01)
+			filt = (self.metadata['steering'].abs() < width)
 
 			# perhaps these shouldn't be removed
-			filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-			filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+			filt |= ((self.metadata['steering'] - self.side_camera_bias).abs() < width)
+			filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
@@ -194,7 +196,7 @@ class Process(object, metaclass=Singleton):
 			filt = self.metadata['steering'].abs().eq(0)
 
 			# perhaps these shouldn't be removed
-			filt |= self.metadata['steering'].abs().eq(side_camera_bias)
+			filt |= self.metadata['steering'].abs().eq(self.side_camera_bias)
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
@@ -229,9 +231,9 @@ class Process(object, metaclass=Singleton):
 
 		#filt = train_filt & (self.metadata['steering'].abs() < 0.01)
 		#filt = train_filt & self.metadata['steering'].abs().lt(0.01)
-		filt = self.metadata['steering'].abs().gt(0.01)
-		filt |= ((self.metadata['steering'] - side_camera_bias).abs() < 0.01)
-		filt |= ((self.metadata['steering'] + side_camera_bias).abs() < 0.01)
+		filt = self.metadata['steering'].abs().gt(width)
+		filt |= ((self.metadata['steering'] - self.side_camera_bias).abs() < width)
+		filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
 
 		#translate_md.loc[:, 'identity'] = False
 		#translate_md.loc[:, 'translate'] = True
@@ -244,12 +246,16 @@ class Process(object, metaclass=Singleton):
 		flip_md.loc[:, 'identity'] = False
 		flip_md.loc[:, 'flip'] = True
 
+		half_md = self.metadata[filt].sample(frac=1)
+		half_md.loc[:, 'identity'] = False
+		half_md.loc[:, 'half'] = True
+
 		shear_md = self.metadata[filt].sample(frac=0.3)
 		shear_md.loc[:, 'identity'] = False
 		shear_md.loc[:, 'shear'] = True
 
 		# concat all augmentations
-		self.metadata = pd.concat([self.metadata, flip_md, shear_md, translate_md], axis='rows', ignore_index=True, sort=False).sample(frac=1)
+		self.metadata = pd.concat([self.metadata, flip_md, shear_md, translate_md, half_md], axis='rows', ignore_index=True, sort=False).sample(frac=1)
 
 		# save 
 		for _ in range(10):
@@ -292,23 +298,32 @@ class Process(object, metaclass=Singleton):
 		self.metadata = pd.read_hdf("metadata.hdf", key="metadata")
 
 	def imshow_augmentations(self, image, image_name=None, velocity=None, save=False, show=False):
-		fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(20,20))
+		fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(20,20))
 		model = Sequential()
 		model.add(Cropping2D(cropping=(PARAMS['crop'], (0,0)), input_shape=image.shape))
 
 		cropped_output = keras.backend.function([model.layers[0].input], [model.layers[0].output])
 		new_image = cropped_output([image[None,...]])[0]
-		for iimg in [0, 2]:
+		for iimg in [0, 2, 3]:
 			axes[iimg][0].imshow(image / 255, cmap='gray')
 			axes[iimg][0].set_title('raw')
+
+		axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
+		axes[0][1].set_title('cropped')
 
 		if velocity is not None:
 			p0, p1, al = velocity
 			X = np.array([p1[0], p0[0]])
 			Y = np.array([p1[1], p0[1]])
-			for iimg in [0, 2]:
+			for iimg in [0, 2, 3]:
 				axes[iimg][0].plot(X, Y, linewidth=10)
 				axes[iimg][0].set_title("steering {0:2.1f}".format(al * 180 / np.pi))
+
+			# show half image obscure
+			half_image, steering = self.mask_half(image, velocity[2])
+			axes[3][1].imshow(half_image / 255, cmap='gray')
+			axes[3][1].plot(X, Y, linewidth=10)
+			axes[3][1].set_title("Occlusion, steering {0:2.1f}".format(steering * 180 / np.pi))
 
 			# flip
 			flipped, flip_al = self.flip(image, al)
@@ -323,10 +338,12 @@ class Process(object, metaclass=Singleton):
 			axes[2][1].plot(X, Y, linewidth=10)
 			axes[2][1].set_title("steering {0:2.1f}".format(flip_al * 180 / np.pi))
 
-		axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
-		axes[0][1].set_title('cropped')
+			
 
-		if velocity is not None:
+		#axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
+		#axes[0][1].set_title('cropped')
+
+		#if velocity is not None:
 			augmentations = [self.shear, self.translate]
 			title = ["sheared cropped", "translated cropped"]
 			for i in range(1): #range(len(augmentations)):
@@ -401,6 +418,10 @@ class Process(object, metaclass=Singleton):
 		elif metadata['translate']:
 			return self.translate(image, metadata['steering'], self.max_train_angle)
 
+		# (5) half mask
+		elif metadata['half']:
+			return self.mask_half(image, metadata['steering'])
+
 		else:
 			raise Exception("how did you get here?")
 		# TODO: rotate ..
@@ -440,6 +461,26 @@ class Process(object, metaclass=Singleton):
 		image = cv2.warpAffine(image, M, (cols, rows), borderMode=cv2.BORDER_REPLICATE)
 
 		return image, steering_angle_out
+
+	@staticmethod
+	def mask_half(image, steering_angle):
+		img = image.copy()
+		rows, cols = img.shape[:2]
+
+		if steering_angle > 0:
+			contours = np.array([[0, 0], [0, rows], [cols/2, rows], [cols/2 + rows * np.tan(steering_angle), 0]], np.int32)
+		else:
+			contours = np.array([[cols, 0], [cols, rows], [cols/2, rows], [cols/2 + rows * np.tan(steering_angle), 0]], np.int32)
+
+		cv2.fillPoly(img, pts=[contours], color=(0, 0, 0))
+
+
+		#if np.random.rand() < 0.5:
+		#	img[:, :cols//2] = 0
+		#else:
+		#	img[:, cols//2:] = 0
+
+		return img, steering_angle
 
 	@staticmethod
 	def translate(image, steering_angle, max_angle):

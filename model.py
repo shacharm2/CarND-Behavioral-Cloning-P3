@@ -137,7 +137,7 @@ def test_model_0(in_shape, show=False):
 
 	params = {}
 	params["EPOCHS"] = 10
-	params["BATCH_SIZE"] = 256
+	params["BATCH_SIZE"] = 128
 
 	return model, params
 
@@ -171,16 +171,16 @@ if __name__ == "__main__":
 	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
 	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
-	# samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
+	samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)
 	if not os.path.exists("model.h5") or not os.path.exists("model_weights.h5"):
 		model.fit_generator(
 			generator=train_generator,
-			verbose=1,
+			#steps_per_epoch=samples_per_epoch // BATCH_SIZE,
+			#verbose=1,
 			validation_data=valid_generator,
 			validation_steps=validation_steps,
-			epochs=EPOCHS,
-			workers=10)
+			epochs=EPOCHS)
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
