@@ -47,9 +47,11 @@ controller = SimplePIController(0.1, 0.002)
 set_speed = 9
 controller.set_desired(set_speed)
 
+avg_steering = []
 
 @sio.on('telemetry')
 def telemetry(sid, data):
+	global avg_steering
 	if data:
 		# The current steering angle of the car
 		steering_angle = data["steering_angle"]
@@ -69,11 +71,17 @@ def telemetry(sid, data):
 		## nvidia preprocess
 
 		steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
-		# steering_angle = float(model.predict(image_array, batch_size=1))
 
+		if len(avg_steering) < 5:
+			avg_steering.append(steering_angle)
+		else:
+			avg_steering = avg_steering[1:] + [steering_angle]
+			steering_angle = np.average(avg_steering)#, weights=range(len(avg_steering)))
+
+		
 		throttle = controller.update(float(speed))
 
-		print(steering_angle, throttle)
+		print(steering_angle, throttle, speed, steering_angle)
 		send_control(steering_angle, throttle)
 
 		# save frame
