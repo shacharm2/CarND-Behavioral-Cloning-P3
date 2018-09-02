@@ -82,7 +82,7 @@ Run the drive sequence with the matching model:
 
 ## Code details
 
-(1) data_server/generator.py
+*  data_server/generator.py
 
 The data generator inherits from Keras' Sequence class, designed for data serving. In order to use the class, two methods, namely, __len__ & __getitem__ needed to be implemented:
 
@@ -93,14 +93,17 @@ The data generator inherits from Keras' Sequence class, designed for data servin
 		def __getitem__(self, index):
 			...
 
-model.py
+* model.py
 
 Straight forward usage - build the model (Final model uses the Sequential API), compile and serve through Keras' fit_generator() API
 
-trace.py
+* trace.py
 
 Used for multithreading debuging
 
+* drive.py
+
+Use for autonomous mode
 
 # Model Architecture and Training Strategy
 
