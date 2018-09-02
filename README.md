@@ -220,7 +220,7 @@ Two histograms and a curve proportional to the PDF (probability density function
 
 It can be seen in the lower curve, that the three over-populated angles were subdued, creating a more subtle curve.
 
-![steering_angles]steering_angles
+![steering_angles]
 
 The dilution still kept a little more of the 0-ed angled images, as most of the time the steering angle is around 0 and this would give extra samples for fine tuning the behaviour around the 0 degrees steering angle.
 
