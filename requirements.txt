@@ -11,3 +11,4 @@ Flask==1.0.2
 moviepy==0.2.3.5
 scikit_learn==0.19.2
 gevent_socketio==0.3.6
+pygments==2.2.0

@@ -329,3 +329,4 @@ Not much variability has been found and similar results between all, considering
 
 [6] [DenstNet #1](https://towardsdatascience.com/densenet-2810936aeebb)
 
+[7] [multithreaded debuging](http://bzimmer.ziclix.com/2008/12/17/python-thread-dumps/)
