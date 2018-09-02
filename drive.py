@@ -74,7 +74,7 @@ def telemetry(sid, data):
 
 		steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
-		if len(avg_steering) < 2:
+		if len(avg_steering) < 3:
 			avg_steering.append(steering_angle)
 		else:
 			avg_steering = avg_steering[1:] + [steering_angle]

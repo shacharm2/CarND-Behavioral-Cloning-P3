@@ -19,7 +19,9 @@ Overview
 
 Deep network for learning to drive a course
 
-![project_video](./output_images/video.gif)
+| Course  | Reverse course |
+|---|---|
+| ![project_video 1](./output_images/video.gif) | ![project_video 2](./output_images/video_reverse_course.gif)
 
 
 
@@ -169,9 +171,11 @@ Overfitting has been met with
 
 2. Weight regularization - L2 regularization for the Dense layers. Weights have been tested on various scales (10 to the minus -1 to -5) and a standard value of 10 to the -3 have been selected as a minimum error value for the (final) validation error.
 
-## Learning rate
+## Tuning
 
-Learning rate has been input into the Adam optimizer
+* Learning rate has been input into the Adam optimizer
+
+* Epochs - raise between 3 and 15 and set to 10. After 10, the vehicle wobbling increases and thus, assuming overfitting occures, which makes performance degredation in the simulator. 
 
 ## Data 
 
@@ -259,6 +263,18 @@ Example 2
 ---
 
 ![augmentations2]augmentations2
+
+# Results
+
+As shown in the begining
+
+1. Course (GIF)
+![project_video 1](./output_images/video.gif)
+
+2. Reverse course (GIF)
+
+![project_video 2](./output_images/video_reverse_course.gif)
+
 
 
 # Conclusions
