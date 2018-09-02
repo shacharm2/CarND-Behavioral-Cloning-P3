@@ -250,9 +250,13 @@ Several data augmentation have been employed. Every augmentation augments the st
 
 2. Flip an image
 
+	About the y axis (middle of image), left to right
+
 3. Shear an image
 
 	On top of the translation, this creates new deformations to the images.
+
+	An angle was randomly (uniform) selected and from it the dx shear distance has been calculated
 
 4. Occlusions
 
@@ -321,3 +325,18 @@ Additional architectures were tested
 - Shallow-er deep network
 
 Not much variability has been found and similar results between all, considering model size - lowest model size has been taken.
+
+# References
+
+[1] [cropping](https://stackoverflow.com/questions/41925765/keras-cropping2d-changes-color-channel)
+
+[2] [Idea for shear](https://github.com/ctsuu/Behavioral-Cloning/tree/0dc191987c0dc07bc7f116c18be3c7f9bb8a101f) - another Udacity project
+
+[3] [BatchNormalization - optimal usage](https://stackoverflow.com/questions/34716454/where-do-i-call-the-batchnormalization-function-in-keras)
+
+[4] [Nvidia model](https://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf)
+
+[5] [DenseNet](https://github.com/flyyufelix/DenseNet-Keras)
+
+[6] [DenstNet #1](https://towardsdatascience.com/densenet-2810936aeebb)
+

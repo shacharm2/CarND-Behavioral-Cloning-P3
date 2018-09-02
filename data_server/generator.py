@@ -34,8 +34,6 @@ import logging
 logging.getLogger().addHandler(logging.StreamHandler())
 
 
-#https://keunwoochoi.wordpress.com/2017/08/24/tip-fit_generator-in-keras-how-to-parallelise-correctly/
-
 PARAMS = {"crop": (50, 25)}
 
 class threadsafe_iter(object):
@@ -64,7 +62,6 @@ def threadsafe_generator(f):
 	return g
 
 
-#def augment(image, steering, identity, flip, shear, translate, half, max_train_angle):
 def augment(image, metadata, max_train_angle):
 	""" """
 	# for xi in range(1):
@@ -673,30 +670,12 @@ def batch_generator(train_type='train', batch_size=None):
 		i_batch += 1
 
 
-	# for i_batch, (_x, _y) in enumerate(process.get(train_type)):
-	# 	if batch_x is None:
-	# 		height, width, nchannels = _x.shape
-	# 		batch_x = np.zeros((batch_size, height, width, nchannels), np.uint8)
-	# 		batch_y = np.zeros(batch_size)
-
-	# 	batch_x[i_batch % batch_size] = _x
-	# 	batch_y[i_batch % batch_size] = _y
-	# 	if i_batch % batch_size == batch_size - 1:
-	# 		yield batch_x, batch_y
-	# 		batch_x, batch_y = None, None
-
 class DataGenerator(keras.utils.Sequence):
-	# def __init__(self, list_IDs, labels, batch_size=32, dim=(32,32,32), nchannels=1,
-	#              n_classes=10, shuffle=True):
-	# def __init__(self, train_type, batch_size, height, width, nchannels, shuffle=True):
 
 	lock = {}
 	def __init__(self, train_type, batch_size, shuffle=True):
 		self.train_type = train_type
-		# self.height = height
-		# self.width = width
 		self.batch_size = batch_size
-		# self.nchannels = nchannels
 		self.metadata = Process().md[train_type]
 
 		self.N = int(np.floor(Process().total_samples(self.train_type) / self.batch_size))
