@@ -103,6 +103,7 @@ def work_model(in_shape, show=False):
 	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3), name='FC_Desne_2'))
 	model.add(Dense(16, activation='relu', kernel_regularizer=l2(1e-3), name='FC_Dense_3'))
 	model.add(Dense(1, name='FC_output'))
+
 	print(model.summary())
 	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=[metrics.mean_squared_error])
 
@@ -302,42 +303,32 @@ def main():
 	# imshow_cropped(batch_x[0])
 	# ipdb.set_trace()
 
-	prev = True
-	if prev:
-		train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
-		valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
-	else:
-		train_generator = data_server.batch_generator("train", batch_size=BATCH_SIZE)
-		valid_generator = data_server.batch_generator("valid", batch_size=BATCH_SIZE)
+	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
+	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
 
-	#train_generator = data_server.batch_generator(train_type='train', batch_size=None):
-	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
-	#samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
 	validation_steps = data_server.Process().total_samples("valid") // BATCH_SIZE
 	train_steps = data_server.Process().total_samples("terain") // BATCH_SIZE
 	if not os.path.exists("model.h5") or not os.path.exists("model_weights.h5"):
-		if prev:
-			model.fit_generator(
-				use_multiprocessing=True,
-				workers=3,
-				generator=train_generator,
-				verbose=1,
-				validation_data=valid_generator,
-				epochs=EPOCHS)
-		else:
-			model.fit_generator(
-				use_multiprocessing=False,
-				generator=train_generator,
-				samples_per_epoch=train_steps, #samples_per_epoch // BATCH_SIZE,
-				verbose=1,
-				validation_data=valid_generator,
-				validation_steps=validation_steps,
-				epochs=EPOCHS)
-
-
+		history_object= model.fit_generator(
+			use_multiprocessing=True,
+			workers=3,
+			generator=train_generator,
+			verbose=1,
+			validation_data=valid_generator,
+			epochs=EPOCHS)
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
+
+		fig = plt.figure()
+		plt.plot(history_object.history['loss'])
+		plt.plot(history_object.history['val_loss'])
+		plt.title('model mean squared error loss')
+		plt.ylabel('mean squared error loss')
+		plt.xlabel('epoch')
+		plt.legend(['training set', 'validation set'], loc='upper right')
+		plt.savefig("output_images/loss_history.png".format(np.random.randint(1000)))
+		plt.close(fig)
 
 
 	#data_server.Process().load_metadata()
