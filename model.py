@@ -128,9 +128,18 @@ class DenseNet(Model):
 
 		x = self.bottleneck_block(x, channels)
 
+
+		# dense block
+		for i in range(4):
+			x_block = self.conv_block(x, channels)
+			x = concatenate([x, x_block])
+
+		x = self.bottleneck_block(x, channels)
+
+
 		# output
 		x = Flatten()(x)
-		#x = Dense(64, activation='relu', kernel_regularizer=l2(1e-3), name="FC_stage_{}".format(self.stage))(x)
+		x = Dense(64, activation='relu', kernel_regularizer=l2(1e-3), name="FC_stage_{}".format(self.stage))(x)
 		x = Dense(32, activation='relu', kernel_regularizer=l2(1e-3))(x)
 		x = Dense(16, activation='relu', kernel_regularizer=l2(1e-3))(x)
 		x = Dense(1)(x)
@@ -142,7 +151,7 @@ class DenseNet(Model):
 	def set_params(self):
 		self.params = {}
 		self.params["EPOCHS"] = 10
-		self.params["BATCH_SIZE"] = 32
+		self.params["BATCH_SIZE"] = 64
 
 
 	def bottleneck_block(self, x, channels):
