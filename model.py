@@ -112,7 +112,13 @@ def test_model(in_shape, show=False):
 
 class DenseNet(Model):
 	# https://towardsdatascience.com/densenet-2810936aeebb
-	def __init__(self, in_shape, show=False):
+	def __init__(self, in_shape=None, show=False, inputs=None, outputs=None, name=None):
+				#super().__init__(inputs=inputs, outputs=x)
+		if inputs and outputs and name:
+			super().__init__(inputs=inputs, outputs=outputs, name=name)
+			return
+
+
 		channels = 8
 		self.stage = 0
 		self.set_params()
@@ -143,7 +149,7 @@ class DenseNet(Model):
 		x = Dense(32, activation='relu', kernel_regularizer=l2(1e-3))(x)
 		x = Dense(16, activation='relu', kernel_regularizer=l2(1e-3))(x)
 		x = Dense(1)(x)
-		super().__init__(inputs=inputs, outputs=x)
+		super().__init__(inputs=inputs, outputs=x, name=name)
 
 		print(self.summary())
 		self.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=[metrics.mean_squared_error])
@@ -233,6 +239,12 @@ def main():
 		model_name = sys.argv[-1]
 
 	model, params = generate_model(model_name=model_name, in_shape=(160, 320, 3))
+	if not os.path.exists("model.h5") and os.path.exists('model_weights.h5'):
+		model.load_weights('model_weights.h5', by_name=True)
+		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
+		return
+
+
 	EPOCHS = params["EPOCHS"]
 	BATCH_SIZE = params["BATCH_SIZE"]
 
@@ -282,10 +294,6 @@ def main():
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
 
-
-	if not os.path.exists("model.h5"):
-		model.load_weights('model_weights.h5', by_name=True)
-		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 
 	#data_server.Process().load_metadata()
 	#metadata = data_server.Process().metadata
