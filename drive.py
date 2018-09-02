@@ -20,6 +20,8 @@ sio = socketio.Server()
 app = Flask(__name__)
 model = None
 prev_image_array = None
+from model import DenseNet
+import ipdb
 
 
 class SimplePIController:
@@ -44,7 +46,7 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 9
+set_speed = 15
 controller.set_desired(set_speed)
 
 avg_steering = []
@@ -72,7 +74,7 @@ def telemetry(sid, data):
 
 		steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
-		if len(avg_steering) < 5:
+		if len(avg_steering) < 2:
 			avg_steering.append(steering_angle)
 		else:
 			avg_steering = avg_steering[1:] + [steering_angle]
@@ -135,7 +137,7 @@ if __name__ == '__main__':
 		print('You are using Keras version ', keras_version,
 			  ', but the model was built using ', model_version)
 
-	model = load_model(args.model)
+	model = load_model(args.model, custom_objects={'DenseNet': DenseNet})
 
 	if args.image_folder != '':
 		print("Creating image folder at {}".format(args.image_folder))
