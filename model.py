@@ -8,6 +8,7 @@ import sys
 #import tensorflow as tf
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Cropping2D, Lambda, Conv2D, Flatten, BatchNormalization, Activation, ELU, Dropout, MaxPooling2D, merge
+from keras.utils.vis_utils import plot_model
 from keras.layers.merge import concatenate
 from keras.optimizers import Adam
 from keras import metrics
@@ -78,29 +79,30 @@ def nvidia_model(in_shape):
 
 def work_model(in_shape, show=False):
 	model = Sequential()
-	model.add(Lambda(lambda x: x/255 - 1.0, input_shape=in_shape))
-	model.add(Conv2D(3, (1, 1), activation='relu'))
-	model.add(Cropping2D(cropping=(data_server.PARAMS['crop'], (0,0)), input_shape=in_shape))
+	model.add(Lambda(lambda x: x/255 - 1.0, input_shape=in_shape, name="Normalization"))
+	model.add(Conv2D(3, (1, 1), activation='relu', name="A_parametric_Colorspace_transformation"))
+	model.add(Cropping2D(cropping=(data_server.PARAMS['crop'], (0,0)), input_shape=in_shape, name="ROI_crop"))
 
+	name = "block"
 	for i in range(3):
 
-		model.add(Conv2D(8, (3, 3)))
-		model.add(BatchNormalization())
-		model.add(Activation(activation='relu'))
+		model.add(Conv2D(8, (3, 3), name='block_{}_3x3conv2D_1'.format(i)))
+		model.add(BatchNormalization(name='block_{}_BN_1'.format(i)))
+		model.add(Activation(activation='relu', name='block_{}_ReLU_1'.format(i)))
 
-		model.add(Conv2D(8, (3, 3)))
-		model.add(BatchNormalization())
-		model.add(Activation(activation='relu'))
+		model.add(Conv2D(8, (3, 3), name='block_{}_3x3conv2D_2'.format(i)))
+		model.add(BatchNormalization(name='block_{}_BN_2'.format(i)))
+		model.add(Activation(activation='relu', name='block_{}_ReLU_2'.format(i)))
 
-		model.add(Conv2D(8, (1, 1), activation='relu'))
-		model.add(MaxPooling2D(pool_size=(2,2)))
+		model.add(Conv2D(8, (1, 1), activation='relu', name='block_{}_Conv2D_ReLU'.format(i)))
+		model.add(MaxPooling2D(pool_size=(2,2), name='block_{}_maxpool2D'.format(i)))
 
 
-	model.add(Flatten())
-	model.add(Dense(64, activation='relu', kernel_regularizer=l2(1e-3)))
-	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3)))
-	model.add(Dense(16, activation='relu', kernel_regularizer=l2(1e-3)))
-	model.add(Dense(1))
+	model.add(Flatten(name='FC_flatten'))
+	model.add(Dense(64, activation='relu', kernel_regularizer=l2(1e-3), name='FC_Dense_1'))
+	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3), name='FC_Desne_2'))
+	model.add(Dense(16, activation='relu', kernel_regularizer=l2(1e-3), name='FC_Dense_3'))
+	model.add(Dense(1, name='FC_output'))
 	print(model.summary())
 	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=[metrics.mean_squared_error])
 
@@ -279,7 +281,10 @@ def main():
 		model_name = sys.argv[-1]
 
 	model, params = generate_model(model_name=model_name, in_shape=(160, 320, 3))
-	if not os.path.exists("model.h5") and os.path.exists('model_weights.h5'):
+	plot_model(model, to_file='output_images/model_plot.png', show_shapes=True, show_layer_names=True)
+	if os.path.exists("model.h5") and os.path.exists('model_weights.h5'):
+		return
+	elif not os.path.exists("model.h5") and os.path.exists('model_weights.h5'):
 		model.load_weights('model_weights.h5', by_name=True)
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		return
