@@ -1,23 +1,27 @@
+[//]: # (Image References)
+
+[model_plot]: output_images/model_plot.png
+[augmentations0]: output_images/1_cropped_center_2016_12_01_13_33_05_396.png
+[augmentations1]: output_images/1_cropped_center_2016_12_01_13_32_45_578.png
+[augmentations2]: output_images/1_cropped_center_2016_12_01_13_33_57_010.png
+
+[steering_data]: output_images/1_steerings_data.png
+[triple_view]: output_images/1_three_views_data.png
+[steering_angles]: output_images/1_steering_histogram.png
+
+
 # Behavioral Cloning Project
 
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
 Overview
 ---
-This repository contains starting files for the Behavioral Cloning Project.
 
-In this project, you will use what you've learned about deep neural networks and convolutional neural networks to clone driving behavior. You will train, validate and test a model using Keras. The model will output a steering angle to an autonomous vehicle.
+Deep network for learning to drive a course
 
-We have provided a simulator where you can steer a car around a track for data collection. You'll use image data and steering angles to train a neural network and then use this model to drive the car autonomously around the track.
+![project_video](./output_images/video.gif)
 
-We also want you to create a detailed writeup of the project. Check out the [writeup template](https://github.com/udacity/CarND-Behavioral-Cloning-P3/blob/master/writeup_template.md) for this project and use it as a starting point for creating your own writeup. The writeup can be either a markdown file or a pdf document.
 
-To meet specifications, the project will require submitting five files: 
-* model.py (script used to create and train the model)
-* drive.py (script to drive the car - feel free to modify this file)
-* model.h5 (a trained Keras model)
-* a report writeup file (either markdown or pdf)
-* video.mp4 (a video recording of your vehicle driving autonomously around the track for at least one full lap)
 
 This README file describes how to output the video in the "Details About Files In This Directory" section.
 
@@ -29,15 +33,9 @@ All that said, please be concise!  We're not looking for you to write a book her
 
 You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
 
-The Project
----
-The goals / steps of this project are the following:
-* Use the simulator to collect data of good driving behavior 
-* Design, train and validate a model that predicts a steering angle from image data
-* Use the model to drive the vehicle autonomously around the first track in the simulator. The vehicle should remain on the road for an entire loop around the track.
-* Summarize the results with a written report
+# PROJECT SPECIFICATIONS
 
-PROJECT SPECIFICATION
+## Criteria
 ---
 | Topic  | CRITERIA   | MEETS SPECIFICATIONS |
 |---|---|---|
@@ -53,6 +51,17 @@ PROJECT SPECIFICATION
 | Architecture and Training Documentation  | Is the creation of the training dataset and training process documented? |  The README describes how the model was trained and what the characteristics of the dataset are. Information such as how the dataset was generated and examples of images from the dataset must be included. |
 | Simulation | Is the car able to navigate correctly on test data?  | No tire may leave the drivable portion of the track surface. The car may not pop up onto ledges or roll over any surfaces that would otherwise be considered unsafe (if humans were in the vehicle). |
 
+## Details About Files In This Directory
+
+| file | description  | 
+| :-----: | :-------------------: |
+| model.py | script used to create and train the model |
+| drive.py | script to drive the car |
+| data_server/generator.py | data serving - loading, augmenting and batch generation |
+| model.h5 | the trained Keras model |
+| readme.md | report |
+| video.mp4 | a few laps around the course |
+| video_reverse_course.mp4 | a few laps |
 
 
 # Project code
@@ -100,7 +109,12 @@ Used for multithreading debuging
 
 The goal was building a model that sucessfully drives continuously, while reducing model size as much as possible.
 
-The code uses a straight forward deep architecture with repeating blocks. 
+Final model size is 1.8 MB
+
+The code uses a straight forward deep architecture with repeating blocks.
+
+
+## Repeated block
 
 Each block is composed of:
 
@@ -122,6 +136,142 @@ Each block is composed of:
 
 	3.3. Relu activation
 
-4. Max pooling 2D, 2x2 strides
+4. 2D Convolution - 8 channels, 1x1 convolution
 
-This block is repeated twice
+5. Max pooling 2D, 2x2 strides
+
+## Model architecture
+
+1. Image normalization in the [-1, 1] range
+
+2. Image cropping (Y axis)
+
+3. A-parametric 1x1, 3 channels colorspace transformation
+
+4. Block repetition x3 (3 convolutions and maxpooling)
+
+5. Fully connected 
+
+    5.1. Flatten, 
+
+	5.2. Consecutive dense ReLU layers of sizes 64, 32, 16
+
+	5.3. Output dense ReLU layer of size 1
+
+
+![model_plot][model_plot]
+
+## Overfitting & regularization
+
+Overfitting has been met with 
+
+1. Batch normalization for the convolutional layers (BN does not work well with Dropout and thus dropout has been left out)
+
+2. Weight regularization - L2 regularization for the Dense layers. Weights have been tested on various scales (10 to the minus -1 to -5) and a standard value of 10 to the -3 have been selected as a minimum error value for the (final) validation error.
+
+## Learning rate
+
+Learning rate has been input into the Adam optimizer
+
+## Data 
+
+### Data recordings
+
+Data recording were taken as:
+
+1. Two around the course driving (> 1 loop)
+
+2. One in the reverse course (> 1 loop)
+
+3. A few recovery drives (from the sidelines back to center)
+
+### Data quality
+
+Data quality is at utmost importance, more than the specific architecture that is being used. 
+Thus, the fact that a keyboard is used causes a degredation in the quality of data. The keyboard inserts large angles followed by 0 degrees angles. To overcome the non-contiuous steering angles, that can be seen in the figure below for the three cameras, a centeral-based averaging has been employed to smooth out the angle. 
+
+Under driving.py, due to real time and in order to react quickly, the angle averaging window size is 2, averaging current and previous steering angle.
+
+
+![steering_data]steering_data
+
+
+### Data characteristics
+
+Three images per view. In order to utilize the side images, the original value of 0.2 has been found to yield stable results. Had it been tuned, it had been tuned according to the distance between images, which can be found via image registration techniques and a (pixel-wise) distance to a point in front of the car, or numerically tuned.
+
+
+The three views were plotted with the matching steering angle:
+
+![triple_view][triple_view]
+
+### Data balance
+
+Two histograms and a curve proportional to the PDF (probability density function) of the steering angles are shown:
+
+1. Raw data steering angle histogram
+
+2. Raw data after diluting the over-sampled steering angles. 
+
+It can be seen in the lower curve, that the three over-populated angles were subdued, creating a more subtle curve.
+
+![steering_angles]steering_angles
+
+The dilution still kept a little more of the 0-ed angled images, as most of the time the steering angle is around 0 and this would give extra samples for fine tuning the behaviour around the 0 degrees steering angle.
+
+### Data augmentation
+
+Several data augmentation have been employed. Every augmentation augments the steering angle according to the transformation
+
+1. Oversampling
+
+	Over sampling about steering angles larger that have lower representation in the raw image population. This oversampling just duplicates those images, which may result in overfitting and thus grows the importance of overfitting countermeasures.
+
+1. Translation
+
+	This creates samples similar to the left and right cameras. This allows reaching extreme images that were not in the original raw image population.
+
+	1.1. Translate an image sampled from the general population
+
+	1.2. Translate an image sampled from the samples that have been diluted out of the original raw data population
+
+2. Flip an image
+
+3. Shear an image
+
+	On top of the translation, this creates new deformations to the images.
+
+4. Occlusions
+
+	A human is able to follow a road even if the left/right half is hidden. Thus, half of an image has been masked out according to the steering angle, such that only half the data is available for training.
+
+Example 0 
+---
+![augmentations0]augmentations0
+
+
+Example 1
+---
+
+![augmentations1]augmentations1
+
+Example 2
+---
+
+![augmentations2]augmentations2
+
+
+# Conclusions
+
+The network successfully trained and is able to drive through the course through numerous laps.
+In this project, several architectures were tested, but it all comes down to the quality of the data.
+
+
+
+Additional architectures were tested
+
+- Nvidia model
+- DenseNet
+- Shallow-er deep network
+
+it seems that the 

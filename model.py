@@ -276,7 +276,7 @@ def generate_model(model_name, in_shape):
 	return model, params
 
 def main():
-	model_name = "nvidia"
+	model_name = "work"
 	if len(sys.argv) > 1:
 		model_name = sys.argv[-1]
 

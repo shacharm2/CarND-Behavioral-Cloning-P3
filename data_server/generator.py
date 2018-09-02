@@ -259,34 +259,21 @@ class Process(object, metaclass=Singleton):
 		# max(np.histogram(self.metadata.loc[~filt, "steering"], bins=int(np.sqrt(len(self.metadata))))[0])
 		frac = 0.1
 		width = 0.05
-		if False:
-			nonzero_df = self.metadata[self.metadata['steering'] != 0]
-			zero_df = self.metadata[self.metadata['steering'] == 0].sample(frac=frac)
-		elif True:
-			# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
-			filt = (self.metadata['steering'].abs() < width)
+		# filt = self.metadata['steering'].abs().isin([0, side_camera_bias])
+		filt = (self.metadata['steering'].abs() < width)
 
-			# perhaps these shouldn't be removed
-			filt |= ((self.metadata['steering'] - self.side_camera_bias).abs() < width)
-			filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
+		# perhaps these shouldn't be removed
+		filt |= ((self.metadata['steering'] - self.side_camera_bias).abs() < width)
+		filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
 
-			nonzero_df = self.metadata[~filt]
-			zero_df = self.metadata[filt].sample(frac=frac)
-			zero_df = self.metadata[filt].sample(frac=1)
-			n_in = int(len(zero_df) * 2 * frac)
-			#print("n_in=", n_in, len(zero_df))
-			# unused 0 angle will be used later for augmentations
-			translate0_md = zero_df.iloc[n_in:].sample(frac=frac)
-			zero_df = zero_df.iloc[:n_in]
-		else:
-			filt = self.metadata['steering'].abs().eq(0)
-
-			# perhaps these shouldn't be removed
-			filt |= self.metadata['steering'].abs().eq(self.side_camera_bias)
-
-			nonzero_df = self.metadata[~filt]
-			zero_df = self.metadata[filt].sample(frac=frac)
-
+		nonzero_df = self.metadata[~filt]
+		zero_df = self.metadata[filt].sample(frac=frac)
+		zero_df = self.metadata[filt].sample(frac=1)
+		n_in = int(len(zero_df) * 2 * frac)
+		#print("n_in=", n_in, len(zero_df))
+		# unused 0 angle will be used later for augmentations
+		translate0_md = zero_df.iloc[n_in:].sample(frac=frac)
+		zero_df = zero_df.iloc[:n_in]
 
 		self.metadata = pd.concat([zero_df, nonzero_df], axis='rows')
 		self.split(shuffle, train_size)
@@ -303,7 +290,6 @@ class Process(object, metaclass=Singleton):
 			filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
 			dups = self.metadata[filt_large_angle]# & train_filt]
 			self.metadata = pd.concat([self.metadata, dups], axis='rows', ignore_index=True)
-
 
 		self.metadata['steering'].hist(bins=int(np.sqrt(len(self.metadata))), color='r', alpha=0.5, ax=axes[0], label='preprocessing')
 		self.metadata['steering'].plot.density(bw_method='scott', ax=axes[1], color='r', alpha=0.5, label='preprocessing')
