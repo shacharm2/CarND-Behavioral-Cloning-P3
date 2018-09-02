@@ -27,18 +27,7 @@ Deep network for learning to drive a course
 | ![project_video 1](./output_images/video.gif) | ![project_video 2](./output_images/video_reverse_course.gif)
 
 
-
-This README file describes how to output the video in the "Details About Files In This Directory" section.
-
-Creating a Great Writeup
----
-A great writeup should include the [rubric points](https://review.udacity.com/#!/rubrics/432/view) as well as your description of how you addressed each point.  You should include a detailed description of the code used (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
-
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
-
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
-
-# PROJECT SPECIFICATIONS
+# Project Specifications
 
 ## Criteria
 ---
