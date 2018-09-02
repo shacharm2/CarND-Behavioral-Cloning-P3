@@ -109,7 +109,7 @@ Use for autonomous mode
 
 The goal was building a model that sucessfully drives continuously, while reducing model size as much as possible.
 
-Final model size is 1.8 MB
+Final model size is 1.7 MB
 
 The code uses a straight forward deep architecture with repeating blocks.
 
