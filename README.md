@@ -78,7 +78,7 @@ There are additional models, such as Nvidia and DenseNet that can be called as:
 
 Run the drive sequence with the matching model:
 
-	python3 drive.py test
+	python3 drive.py model.h5
 
 ## Code details
 
