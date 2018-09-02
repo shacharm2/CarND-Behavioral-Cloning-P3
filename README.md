@@ -198,7 +198,7 @@ Thus, the fact that a keyboard is used causes a degredation in the quality of da
 Under driving.py, due to real time and in order to react quickly, the angle averaging window size is 2, averaging current and previous steering angle.
 
 
-![steering_data]steering_data
+![steering_data]
 
 
 ### Data characteristics
