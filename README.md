@@ -1,8 +1,11 @@
 [//]: # (Image References)
 
 [model_plot]: output_images/model_plot.png
+
 [augmentations0]: output_images/1_cropped_center_2016_12_01_13_33_05_396.png
+
 [augmentations1]: output_images/1_cropped_center_2016_12_01_13_32_45_578.png
+
 [augmentations2]: output_images/1_cropped_center_2016_12_01_13_33_57_010.png
 
 [steering_data]: output_images/1_steerings_data.png
@@ -64,6 +67,9 @@ You're not required to use markdown for your writeup.  If you use another method
 | readme.md | report |
 | video.mp4 | a few laps around the course |
 | video_reverse_course.mp4 | a few laps |
+| recovery.mp4 | recovery from being on the sidelines with outward angle |
+| recovery2.mp4 | recovery from being half outside the course |
+
 
 
 # Project code
@@ -177,6 +183,9 @@ Overfitting has been met with
 
 * Epochs - raise between 3 and 15 and set to 10. After 10, the vehicle wobbling increases and thus, assuming overfitting occures, which makes performance degredation in the simulator. 
 
+* Model - several models have been tested (see Notes), but all have yielded similar results and thus, smallest model has been chosen.
+
+
 ## Data 
 
 ### Data recordings
@@ -251,38 +260,59 @@ Several data augmentation have been employed. Every augmentation augments the st
 
 Example 0 
 ---
-![augmentations0]augmentations0
+![augmentations0]
 
 
 Example 1
 ---
 
-![augmentations1]augmentations1
+![augmentations1]
 
 Example 2
 ---
 
-![augmentations2]augmentations2
+![augmentations2]
 
 # Results
 
+The vehicle was tested with speed of 15
+
 As shown in the begining
 
-1. Course (GIF)
+1. Course 
+
+[video.mp4](video.mp4)
+
 ![project_video 1](./output_images/video.gif)
 
-2. Reverse course (GIF)
+
+2. Reverse course 
+
+[video_reverse_course.mp4](video_reverse_course.mp4)
 
 ![project_video 2](./output_images/video_reverse_course.gif)
 
+3. Recovery #1
+
+[recovery](recovery.mp4)
+
+![recovery](./output_images/recovery.gif)
+
+4. Recovery #2
+
+[recovery](recovery2.mp4)
+
+![recovery](./output_images/recovery.gif)
 
 
 # Conclusions
 
-The network successfully trained and is able to drive through the course through numerous laps.
-In this project, several architectures were tested, but it all comes down to the quality of the data.
+The network successfully trained and is able to drive through the course through numerous laps. In this project, several architectures were tested, but it all comes down to the quality of the data. One major drawback of the simulator is the keboard usage which introduces zero degree steering angles, which is data that is not used after dilution. 
+
+The vehicle sucessfully runs in two directions of the course and is also able to find its way out of large angled and extreme positions.
 
 
+# Notes
 
 Additional architectures were tested
 
@@ -290,4 +320,4 @@ Additional architectures were tested
 - DenseNet
 - Shallow-er deep network
 
-it seems that the 
+Not much variability has been found and similar results between all, considering model size - lowest model size has been taken.
