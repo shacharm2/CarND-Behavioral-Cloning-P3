@@ -74,6 +74,43 @@ def nvidia_model(in_shape):
 
 	return model, params
 
+
+
+def work_model(in_shape, show=False):
+	model = Sequential()
+	model.add(Lambda(lambda x: x/255 - 1.0, input_shape=in_shape))
+	model.add(Conv2D(3, (1, 1), activation='relu'))
+	model.add(Cropping2D(cropping=(data_server.PARAMS['crop'], (0,0)), input_shape=in_shape))
+
+	for i in range(3):
+
+		model.add(Conv2D(8, (3, 3)))
+		model.add(BatchNormalization())
+		model.add(Activation(activation='relu'))
+
+		model.add(Conv2D(8, (3, 3)))
+		model.add(BatchNormalization())
+		model.add(Activation(activation='relu'))
+
+		model.add(Conv2D(8, (1, 1), activation='relu'))
+		model.add(MaxPooling2D(pool_size=(2,2)))
+
+
+	model.add(Flatten())
+	model.add(Dense(64, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(16, activation='relu', kernel_regularizer=l2(1e-3)))
+	model.add(Dense(1))
+	print(model.summary())
+	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=[metrics.mean_squared_error])
+
+	params = {}
+	params["EPOCHS"] = 10
+	params["BATCH_SIZE"] = 128
+
+	return model, params
+
+
 def test_model(in_shape, show=False):
 	model = Sequential()
 	model.add(Lambda(lambda x: x/255 - 1.0, input_shape=in_shape))
@@ -156,7 +193,7 @@ class DenseNet(Model):
 
 	def set_params(self):
 		self.params = {}
-		self.params["EPOCHS"] = 10
+		self.params["EPOCHS"] = 12
 		self.params["BATCH_SIZE"] = 64
 
 
@@ -222,7 +259,10 @@ def inception_model(in_shape, show=False):
 
 def generate_model(model_name, in_shape):
 	print(model_name)
-	if model_name == "test":
+
+	if model_name == "work":
+		model, params = work_model(in_shape)
+	elif model_name == "test":
 		model, params = test_model(in_shape)
 	elif model_name == "nvidia":
 		model, params = nvidia_model(in_shape)
@@ -273,8 +313,8 @@ def main():
 	if not os.path.exists("model.h5") or not os.path.exists("model_weights.h5"):
 		if prev:
 			model.fit_generator(
-				use_multiprocessing=False,
-				workers=1,
+				use_multiprocessing=True,
+				workers=3,
 				generator=train_generator,
 				verbose=1,
 				validation_data=valid_generator,
@@ -300,6 +340,5 @@ def main():
 
 
 if __name__ == "__main__":
-	DenseNet((160, 32, 3))
 	main()
 

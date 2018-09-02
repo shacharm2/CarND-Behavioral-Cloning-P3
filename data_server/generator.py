@@ -272,13 +272,12 @@ class Process(object, metaclass=Singleton):
 
 			nonzero_df = self.metadata[~filt]
 			zero_df = self.metadata[filt].sample(frac=frac)
-			#zero_df = self.metadata[filt].sample(frac=1)
-			#n_in = int(len(zero_df) * 2 * frac)
-			##print("n_in=", n_in, len(zero_df))
-			#
-			# # unused 0 angle will be used later for augmentations
-			# translate0_md = zero_df.iloc[n_in:].sample(frac=frac)
-			#zero_df = zero_df.iloc[:n_in]
+			zero_df = self.metadata[filt].sample(frac=1)
+			n_in = int(len(zero_df) * 2 * frac)
+			#print("n_in=", n_in, len(zero_df))
+			# unused 0 angle will be used later for augmentations
+			translate0_md = zero_df.iloc[n_in:].sample(frac=frac)
+			zero_df = zero_df.iloc[:n_in]
 		else:
 			filt = self.metadata['steering'].abs().eq(0)
 
@@ -298,7 +297,7 @@ class Process(object, metaclass=Singleton):
 		## augmentations ##
 		# oversample > 25 deg
 		#(self.metadata['steering'] > 24.5 * np.pi / 180)
-		oversample = False
+		oversample = True
 		if oversample:
 			filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
 			filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
@@ -326,7 +325,7 @@ class Process(object, metaclass=Singleton):
 		#translate_md.loc[:, 'translate'] = True
 
 		translate_md = self.metadata[filt].sample(frac=1)
-		#translate_md = pd.concat([translate_md, translate0_md], ignore_index=True, sort=False)
+		translate_md = pd.concat([translate_md, translate0_md], ignore_index=True, sort=False)
 		translate_md.loc[:, 'identity'] = False
 		translate_md.loc[:, 'translate'] = True
 
