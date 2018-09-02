@@ -55,89 +55,73 @@ PROJECT SPECIFICATION
 
 
 
-### Dependencies
-This lab requires:
+# Project code
 
-* [CarND Term1 Starter Kit](https://github.com/udacity/CarND-Term1-Starter-Kit)
+### Usage
 
-The lab enviroment can be created with CarND Term1 Starter Kit. Click [here](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/README.md) for the details.
+### Training
 
-The following resources can be found in this github repository:
-* drive.py
-* video.py
-* writeup_template.md
+    python3 model.py 
 
-The simulator can be downloaded from the classroom. In the classroom, we have also provided sample data that you can optionally use to help train your model.
+There are additional models, such as Nvidia and DenseNet that can be called as:
 
-## Details About Files In This Directory
+    python3 model.py densenet
+    python3 model.py nvidia
 
-### `drive.py`
+### Autonomous mode
 
-Usage of `drive.py` requires you have saved the trained model as an h5 file, i.e. `model.h5`. See the [Keras documentation](https://keras.io/getting-started/faq/#how-can-i-save-a-keras-model) for how to create this file using the following command:
-```sh
-model.save(filepath)
-```
+Run the drive sequence with the matching model:
 
-Once the model has been saved, it can be used with drive.py using this command:
+	python3 drive.py test
 
-```sh
-python drive.py model.h5
-```
+## Code details
 
-The above command will load the trained model and use the model to make predictions on individual images in real-time and send the predicted angle back to the server via a websocket connection.
+(1) data_server/generator.py
 
-Note: There is known local system's setting issue with replacing "," with "." when using drive.py. When this happens it can make predicted steering values clipped to max/min values. If this occurs, a known fix for this is to add "export LANG=en_US.utf8" to the bashrc file.
+The data generator inherits from Keras' Sequence class, designed for data serving. In order to use the class, two methods, namely, __len__ & __getitem__ needed to be implemented:
 
-#### Saving a video of the autonomous agent
+    class DataGenerator(keras.utils.Sequence):
+		def __len__(self):
+			...
 
-```sh
-python drive.py model.h5 run1
-```
+		def __getitem__(self, index):
+			...
 
-The fourth argument, `run1`, is the directory in which to save the images seen by the agent. If the directory already exists, it'll be overwritten.
+model.py
 
-```sh
-ls run1
+Straight forward usage - build the model (Final model uses the Sequential API), compile and serve through Keras' fit_generator() API
 
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_424.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_451.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_477.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_528.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_573.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_618.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_697.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_723.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_749.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_817.jpg
-...
-```
+trace.py
 
-The image file name is a timestamp of when the image was seen. This information is used by `video.py` to create a chronological video of the agent driving.
+Used for multithreading debuging
 
-### `video.py`
 
-```sh
-python video.py run1
-```
+# Model Architecture and Training Strategy
 
-Creates a video based on images found in the `run1` directory. The name of the video will be the name of the directory followed by `'.mp4'`, so, in this case the video will be `run1.mp4`.
+The goal was building a model that sucessfully drives continuously, while reducing model size as much as possible.
 
-Optionally, one can specify the FPS (frames per second) of the video:
+The code uses a straight forward deep architecture with repeating blocks. 
 
-```sh
-python video.py run1 --fps 48
-```
+Each block is composed of:
 
-Will run the video at 48 FPS. The default FPS is 60.
+1. 2D Convolution, 3 channels, 1x1 convolution, ReLU activation
 
-#### Why create a video
+2. 2D Convolution block
 
-1. It's been noted the simulator might perform differently based on the hardware. So if your model drives succesfully on your machine it might not on another machine (your reviewer). Saving a video is a solid backup in case this happens.
-2. You could slightly alter the code in `drive.py` and/or `video.py` to create a video of what your model sees after the image is processed (may be helpful for debugging).
+	2.1. 2D Convolution - 8 channels, 3x3 convolution
 
-### Tips
-- Please keep in mind that training images are loaded in BGR colorspace using cv2 while drive.py load images in RGB to predict the steering angles.
+	2.2. Batch normalization
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+	2.3. Relu activation
 
+3. 2D Convolution block
+
+	3.1. 2D Convolution - 8 channels, 3x3 convolution
+
+	3.2. Batch normalization
+
+	3.3. Relu activation
+
+4. Max pooling 2D, 2x2 strides
+
+This block is repeated twice
