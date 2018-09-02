@@ -26,10 +26,12 @@ if not "DISPLAY" in os.environ:
 from matplotlib import pyplot as plt
 from shutil import copyfile
 from time import time
-
+import dask.dataframe as dd
 import ipdb
 print(matplotlib.get_backend())
 np.random.seed(int(time()))
+import logging
+logging.getLogger().addHandler(logging.StreamHandler())
 
 
 #https://keunwoochoi.wordpress.com/2017/08/24/tip-fit_generator-in-keras-how-to-parallelise-correctly/
@@ -60,6 +62,89 @@ def threadsafe_generator(f):
 	def g(*a, **kw):
 		return threadsafe_iter(f(*a, **kw))
 	return g
+
+
+#def augment(image, steering, identity, flip, shear, translate, half, max_train_angle):
+def augment(image, metadata, max_train_angle):
+	""" """
+	# for xi in range(1):
+	# 	yield image, steering
+	#if row['augment'] == 'flip':
+
+	# (1) identity
+	if metadata['identity']:
+		return image, metadata['steering']
+
+	# (2) flip
+	elif metadata['flip']:
+		return flip(image, metadata['steering'])
+
+	# (3) shear
+	elif metadata['shear']:
+		return shear(image, metadata['steering'], max_train_angle)
+
+	# (4) shear
+	elif metadata['translate']:
+		return translate(image, metadata['steering'], max_train_angle)
+
+	# (5) half mask
+	elif metadata['half']:
+		return mask_half(image, metadata['steering'])
+
+	else:
+		raise Exception("how did you get here?")
+
+
+def flip(image, steering_angle):
+	return cv2.flip(image, 1), -steering_angle   # cv2.flip(image, 1) or np.fliplr(image)
+
+def shear(image, steering_angle, max_angle):
+	#angle_range = sorted([steering_angle, max_angle * np.sign(steering_angle)])
+	abs_angle = abs(steering_angle)
+	a = np.random.uniform(abs_angle, max_angle)
+	#a = min(a, max_angle)
+	steering_angle_out = a * np.sign(steering_angle)
+
+	rows, cols = image.shape[:2]
+	# around middle point
+	dx = 0.5 * rows * np.tan(steering_angle_out)
+	shifted = [0.5 * cols + dx, 0.5 * rows]
+	pt_in = np.float32([[0, rows],[cols, rows], [cols / 2, rows / 2]])
+	pt_out = np.float32([[0, rows],[cols, rows], shifted])
+	M = cv2.getAffineTransform(pt_in, pt_out)
+	image = cv2.warpAffine(image, M, (cols, rows), borderMode=cv2.BORDER_REPLICATE)
+
+	return image, steering_angle_out
+
+def mask_half(image, steering_angle):
+	img = image.copy()
+	rows, cols = img.shape[:2]
+
+	if steering_angle > 0:
+		contours = np.array([[0, 0], [0, rows], [cols/2, rows], [cols/2 + rows * np.tan(steering_angle), 0]], np.int32)
+	else:
+		contours = np.array([[cols, 0], [cols, rows], [cols/2, rows], [cols/2 + rows * np.tan(steering_angle), 0]], np.int32)
+
+	cv2.fillPoly(img, pts=[contours], color=(0, 0, 0))
+
+	return img, steering_angle
+
+def translate(image, steering_angle, max_angle):
+	#steering_angle_out = steering_angle
+	#while steering_angle_out == steering_angle:
+	abs_angle = abs(steering_angle)
+	a = np.random.uniform(abs_angle, max_angle)
+	steering_angle_out = a * np.sign(steering_angle)
+
+	rows, cols = image.shape[:2]
+	dx = 0.5 * rows * np.tan(steering_angle_out)
+	shifted = [0.5 * cols + dx, 0.5 * rows]
+	pt_in = np.float32([[0, rows], [cols / 2, rows / 2], [cols + dx, rows]])
+	pt_out = np.float32([[dx, rows], [cols / 2 + dx, rows / 2], [cols + dx, rows]])
+	M = cv2.getAffineTransform(pt_in, pt_out)
+	image = cv2.warpAffine(image, M, (cols, rows), borderMode=cv2.BORDER_REPLICATE)
+
+	return image, steering_angle_out
 
 
 class Singleton(type):
@@ -186,14 +271,14 @@ class Process(object, metaclass=Singleton):
 			filt |= ((self.metadata['steering'] + self.side_camera_bias).abs() < width)
 
 			nonzero_df = self.metadata[~filt]
-			#zero_df = self.metadata[filt].sample(frac=frac)
-			zero_df = self.metadata[filt].sample(frac=1)
-			n_in = int(len(zero_df) * 2 * frac)
-			#print("n_in=", n_in, len(zero_df))
-
-			# unused 0 angle will be used later for augmentations
-			translate0_md = zero_df.iloc[n_in:].sample(frac=frac)
-			zero_df = zero_df.iloc[:n_in]
+			zero_df = self.metadata[filt].sample(frac=frac)
+			#zero_df = self.metadata[filt].sample(frac=1)
+			#n_in = int(len(zero_df) * 2 * frac)
+			##print("n_in=", n_in, len(zero_df))
+			#
+			# # unused 0 angle will be used later for augmentations
+			# translate0_md = zero_df.iloc[n_in:].sample(frac=frac)
+			#zero_df = zero_df.iloc[:n_in]
 		else:
 			filt = self.metadata['steering'].abs().eq(0)
 
@@ -213,7 +298,7 @@ class Process(object, metaclass=Singleton):
 		## augmentations ##
 		# oversample > 25 deg
 		#(self.metadata['steering'] > 24.5 * np.pi / 180)
-		oversample = True
+		oversample = False
 		if oversample:
 			filt_large_angle = self.metadata['steering'].gt(24.5 * np.pi / 180)
 			filt_large_angle |= self.metadata['steering'].lt(-20 * np.pi / 180)  #< -20 * np.pi / 180)
@@ -241,7 +326,7 @@ class Process(object, metaclass=Singleton):
 		#translate_md.loc[:, 'translate'] = True
 
 		translate_md = self.metadata[filt].sample(frac=1)
-		translate_md = pd.concat([translate_md, translate0_md], ignore_index=True, sort=False)
+		#translate_md = pd.concat([translate_md, translate0_md], ignore_index=True, sort=False)
 		translate_md.loc[:, 'identity'] = False
 		translate_md.loc[:, 'translate'] = True
 
@@ -278,6 +363,11 @@ class Process(object, metaclass=Singleton):
 			self.imshow_augmentations(image, image_name=image_name, velocity=(p0, p1, al), save=True)
 		else:
 			image = self.open(self.metadata.iloc[0]['image'])
+
+		self.md = {}
+		for train_type in ["train", "valid", "test"]:
+			self.md[train_type] = self.metadata[self.metadata["train_type"].eq(train_type)]
+
 
 	def split(self, shuffle=True, train_size=0.7):
 		""" train/valid/test split """
@@ -341,7 +431,7 @@ class Process(object, metaclass=Singleton):
 			axes[2][1].plot(X, Y, linewidth=10)
 			axes[2][1].set_title("steering {0:2.1f}".format(flip_al * 180 / np.pi))
 
-			
+
 
 		#axes[0][1].imshow(new_image[0, ...] / 255, cmap='gray')
 		#axes[0][1].set_title('cropped')
@@ -389,10 +479,11 @@ class Process(object, metaclass=Singleton):
 
 	def samples_per_epoch(self, batch_size, train_type='train'):
 		""" """
-		filt = (self.metadata['train_type'] == train_type)
+		filt = self.metadata['train_type'].eq(train_type)
 		total_train_images = len(self.metadata[filt])
 		samples_per_epoch = total_train_images - total_train_images % batch_size
 		return samples_per_epoch
+
 
 	def total_samples(self, train_type):
 		""" """
@@ -487,11 +578,19 @@ class Process(object, metaclass=Singleton):
 
 	@staticmethod
 	def translate(image, steering_angle, max_angle):
-		steering_angle_out = steering_angle
-		while steering_angle_out == steering_angle:
-			abs_angle = abs(steering_angle)
-			a = np.random.uniform(abs_angle, max_angle)
-			steering_angle_out = a * np.sign(steering_angle)
+		#steering_angle_out = steering_angle
+		#if steering_angle == max_angle:
+		#	steering_angle = -max_angle
+		#else:
+		#	while steering_angle_out == steering_angle:
+		#		abs_angle = abs(steering_angle)
+		#		a = np.random.uniform(abs_angle, max_angle)
+		#		steering_angle_out = a * np.sign(steering_angle)
+
+		abs_angle = abs(steering_angle)
+		a = np.random.uniform(abs_angle, max_angle)
+		#a = min(a, max_angle)
+		steering_angle_out = a * np.sign(steering_angle)
 
 		rows, cols = image.shape[:2]
 		dx = 0.5 * rows * np.tan(steering_angle_out)
@@ -506,8 +605,9 @@ class Process(object, metaclass=Singleton):
 
 	def get_submetadata(self, train_type, index, batch_size):
 		""" """
-		filt = self.metadata['train_type'].eq(train_type)
-		submetadata = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size]
+		#filt = self.metadata['train_type'].eq(train_type)
+		#submetadata = self.metadata[filt].iloc[index * batch_size:(index+1) * batch_size]
+		submetadata = self.md[train_type].iloc[index * batch_size:(index+1) * batch_size]
 		return submetadata
 
 	def get(self, train_type):
@@ -551,15 +651,29 @@ class Process(object, metaclass=Singleton):
 		# return X, keras.utils.to_categorical(y, num_classes=self.n_classes)
 
 
-
+lock = {}
 def batch_generator(train_type='train', batch_size=None):
 	""" """
 	assert batch_size is not None
-	process = Process()
+	global lock
+
+	metadata = Process().md[train_type]
+	max_train_angle = Process().max_train_angle
+
 	batch_x, batch_y = None, None
 	i_batch = 0
 	while True:
-		_x, _y = next(process.get(train_type))
+		#_x, _y = next(process.get(train_type))
+		row = metadata.iloc[i_batch]
+
+		while row['image'] in lock:
+			print(row['image'], 'is locked')
+		lock[row['image']]= True
+		with Image.open(row['image']) as fd:
+			img = np.asarray(fd)# Image.open(image_file)
+		lock.pop(row['image'])
+
+		_x, _y = augment(img, row, max_train_angle)
 		if batch_x is None:
 			height, width, nchannels = _x.shape
 			batch_x = np.zeros((batch_size, height, width, nchannels), np.uint8)
@@ -572,7 +686,6 @@ def batch_generator(train_type='train', batch_size=None):
 			batch_x, batch_y = None, None
 
 		i_batch += 1
-		print(len(batch_x))
 
 
 	# for i_batch, (_x, _y) in enumerate(process.get(train_type)):
@@ -592,37 +705,56 @@ class DataGenerator(keras.utils.Sequence):
 	#              n_classes=10, shuffle=True):
 	# def __init__(self, train_type, batch_size, height, width, nchannels, shuffle=True):
 
+	lock = {}
 	def __init__(self, train_type, batch_size, shuffle=True):
 		self.train_type = train_type
 		# self.height = height
 		# self.width = width
 		self.batch_size = batch_size
 		# self.nchannels = nchannels
+		self.metadata = Process().md[train_type]
+
+		self.N = int(np.floor(Process().total_samples(self.train_type) / self.batch_size))
+		self.max_train_angle = Process().max_train_angle
+		self.md = []
+		for index in range(len(self.metadata) // batch_size):
+			self.md.append(self.metadata.iloc[index * self.batch_size:(index+1) * self.batch_size])
+		else:
+			self.md.append(self.metadata.iloc[-batch_size:])
+
 		self.shuffle = shuffle
 		self.on_epoch_end()
 
 	def __len__(self):
 		'Denotes the number of batches per epoch'
 		#return int(np.floor(len(self.list_IDs) / self.batch_size))
-		return int(np.floor(Process().total_samples(self.train_type) / self.batch_size))
+		return len(self.md)
 
 	def __getitem__(self, index):
-		metadata = Process().get_submetadata(self.train_type, index, self.batch_size)
+		#metadata = Process().get_submetadata(self.train_type, index, self.batch_size)
 
+		#metadata = self.metadata.iloc[index * self.batch_size:(index+1) * self.batch_size]
+		metadata = self.md[index]
 		# Generate data
 		#X, y = Process().data_generation(indices, self.batch_size)
 		#data_generation(self, indices, batch_size, height, width, nchannels):
 
-		X = None
-		y = None
+		X = np.array([])
+		y = np.array([])
 		# Generate data
 		for j, (i, row) in enumerate(metadata.iterrows()):
 
 			#img = np.asarray(Image.open(row['image']))
 			#img = self.open(row['image'])
+			while row['image'] in self.lock and self.lock[row['image']]:
+				printi(row['image'], "lock")
+
+			DataGenerator.lock[row['image']] = True
 			with Image.open(row['image']) as fd:
-				img = np.asarray(fd)# Image.open(image_file)
-			if X is None or y is None:
+				img = np.asarray(fd)
+			DataGenerator.lock[row['image']] = False
+
+			if len(X) == 0 or len(y) == 0:
 				X = np.empty((self.batch_size, *img.shape))
 				y = np.empty((self.batch_size), dtype=float)
 
@@ -630,7 +762,10 @@ class DataGenerator(keras.utils.Sequence):
 			# for _x, _y in Process().augment(img, row):
 			# 	X[j,] = _x
 			# 	y[j] = _y
-			X[j,], y[j] = Process().augment(img, row)
+			X[j,], y[j] = augment(img, row, self.max_train_angle)
+
+		#Index(['image', 'steering', 'type', 'identity', 'flip', 'half', 'shear',
+       #'translate', 'train_type'],
 
 		return X, y
 
