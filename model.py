@@ -22,7 +22,8 @@ import numpy as np
 import ipdb
 
 import data_server
-
+import trace
+trace.trace_start("trace.html")
 #def Nvidia
 def nvidia_model(in_shape):
 	#model = Sequential()
@@ -112,7 +113,7 @@ def test_model(in_shape, show=False):
 class DenseNet(Model):
 	# https://towardsdatascience.com/densenet-2810936aeebb
 	def __init__(self, in_shape, show=False):
-		channels = 16
+		channels = 8
 		self.stage = 0
 		self.set_params()
 		#uodel = Sequential()
@@ -129,7 +130,7 @@ class DenseNet(Model):
 
 		# output
 		x = Flatten()(x)
-		x = Dense(64, activation='relu', kernel_regularizer=l2(1e-3), name="FC_stage_{}".format(self.stage))(x)
+		#x = Dense(64, activation='relu', kernel_regularizer=l2(1e-3), name="FC_stage_{}".format(self.stage))(x)
 		x = Dense(32, activation='relu', kernel_regularizer=l2(1e-3))(x)
 		x = Dense(16, activation='relu', kernel_regularizer=l2(1e-3))(x)
 		x = Dense(1)(x)
@@ -171,36 +172,37 @@ class DenseNet(Model):
 
 
 def inception_model(in_shape, show=False):
-	#model = Sequential()
-	# https://stackoverflow.com/questions/41925765/keras-cropping2d-changes-color-channel
-	#input_img = Input(shape=in_shape)
 	model = Sequential()
+	model.add(Lambda(lambda x: x/255 - 1.0, input_shape=in_shape))
+	model.add(Cropping2D(cropping=(data_server.PARAMS['crop'], (0,0)), input_shape=in_shape))
 
-	model.add(Cropping2D(cropping=((70, 25), (0,0)), input_shape=in_shape))
-	model.add(Lambda(lambda x: x / 255.0 - 0.5))
+	model.add(Conv2D(3, (1, 1), activation='relu'))
 
-	# colorspace transform
-	model.add(Conv2D(8, (1, 1), activation='relu'))
+	for i in range(2):
+		model.add(Conv2D(8, (3, 3)))
+		model.add(BatchNormalization())
+		model.add(Activation(activation='relu'))
 
-	for i in range(3):
-		model.add(Conv2D(32, (3, 3), activation='relu'))
-		model.add(Conv2D(32, (3, 3), activation='relu'))
-		model.add(MaxPooling2D(pool_size=(2, 2)))
-		model.add(Dropout(0.5))
+		model.add(Conv2D(8, (3, 3)))
+		model.add(BatchNormalization())
+		model.add(Activation(activation='relu'))
+
+		model.add(MaxPooling2D(pool_size=(2,2)))
+
 
 	model.add(Flatten())
-	model.add(Dense(128, activation='relu', kernel_regularizer=l2(1e-3)))
 	model.add(Dense(64, activation='relu', kernel_regularizer=l2(1e-3)))
 	model.add(Dense(32, activation='relu', kernel_regularizer=l2(1e-3)))
-
+	model.add(Dense(16, activation='relu', kernel_regularizer=l2(1e-3)))
 	model.add(Dense(1))
+	print(model.summary())
 
-	model.compile(loss="mse", optimizer="adam")
+
+	model.compile(loss='mean_squared_error', optimizer=Adam(lr=1e-3), metrics=[metrics.mean_squared_error])
 
 	params = {}
 	params["EPOCHS"] = 10
 	params["BATCH_SIZE"] = 128
-
 	return model, params
 
 def generate_model(model_name, in_shape):
@@ -233,20 +235,40 @@ def main():
 	# train_generator = data_server.batch_generator(train_type='train', batch_size=BATCH_SIZE)
 	# imshow_cropped(batch_x[0])
 	# ipdb.set_trace()
-	train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
-	valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
+
+	prev = True
+	if prev:
+		train_generator = data_server.DataGenerator("train", batch_size=BATCH_SIZE, shuffle=True)
+		valid_generator = data_server.DataGenerator("valid", batch_size=BATCH_SIZE, shuffle=True)
+	else:
+		train_generator = data_server.batch_generator("train", batch_size=BATCH_SIZE)
+		valid_generator = data_server.batch_generator("valid", batch_size=BATCH_SIZE)
+
+	#train_generator = data_server.batch_generator(train_type='train', batch_size=None):
 	# model.fit_generator(generator(features, labels, batch_size), samples_per_epoch=50, nb_epoch=10)
-	samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
-	validation_steps = np.ceil(data_server.Process().total_samples("valid") / BATCH_SIZE)
+	#samples_per_epoch = data_server.Process().samples_per_epoch(batch_size=BATCH_SIZE)
+	validation_steps = data_server.Process().total_samples("valid") // BATCH_SIZE
+	train_steps = data_server.Process().total_samples("terain") // BATCH_SIZE
 	if not os.path.exists("model.h5") or not os.path.exists("model_weights.h5"):
-		model.fit_generator(
-			generator=train_generator,
-			#steps_per_epoch=samples_per_epoch // BATCH_SIZE,
-			verbose=1,
-			validation_data=valid_generator,
-			validation_steps=validation_steps,
-			epochs=EPOCHS,
-			workers=3)
+		if prev:
+			model.fit_generator(
+				use_multiprocessing=False,
+				workers=1,
+				generator=train_generator,
+				verbose=1,
+				validation_data=valid_generator,
+				epochs=EPOCHS)
+		else:
+			model.fit_generator(
+				use_multiprocessing=False,
+				generator=train_generator,
+				samples_per_epoch=train_steps, #samples_per_epoch // BATCH_SIZE,
+				verbose=1,
+				validation_data=valid_generator,
+				validation_steps=validation_steps,
+				epochs=EPOCHS)
+
+
 
 		model.save('model.h5')  # creates a HDF5 file 'my_model.h5'
 		model.save_weights('model_weights.h5')
